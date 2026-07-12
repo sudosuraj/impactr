@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Impactr
+Exec=/opt/Impactr/ai.impactr.desktop %U
+Terminal=false
+Type=Application
+Icon=ai.impactr.desktop
+StartupWMClass=ai.impactr.desktop
+NoDisplay=true
+Comment=Open source AI coding agent
+Categories=Development;

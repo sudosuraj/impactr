@@ -1,0 +1,10 @@
+.agent
+.agents
+.env
+.env.local
+node_modules
+dist
+build
+coverage
+*.log
+.DS_Store

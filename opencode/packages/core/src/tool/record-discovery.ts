@@ -1,0 +1,85 @@
+export * as RecordDiscoveryTool from "./record-discovery"
+
+import { ToolFailure } from "@impactr-ai/llm"
+import { Effect, Layer, Schema } from "effect"
+import { makeLocationNode } from "../effect/app-node"
+import { ToolRegistry } from "./registry"
+import { Tool } from "./tool"
+import { Tools } from "./tools"
+import { KnowledgeGraph, node as KnowledgeGraphNode } from "../knowledge/graph"
+import { KnowledgeSaturation, node as KnowledgeSaturationNode } from "../session/saturation"
+import { PermissionV2 } from "../permission"
+
+export const name = "record_discovery"
+
+export const description = `Use this tool to manually record a meaningful finding into the Knowledge Graph during your continuous discovery process. 
+A finding can be a subdomain, an endpoint, a vulnerability, a technology fingerprint, or any other valuable piece of intelligence. 
+You must score the finding to help prioritize future exploration.`
+
+export const Input = Schema.Struct({
+  type: Schema.String.annotate({ description: "The type of the finding (e.g. 'subdomain', 'endpoint', 'vulnerability', 'credential')" }),
+  data: Schema.Unknown.annotate({ description: "A JSON object containing the details of the finding" }),
+  noveltyScore: Schema.Number.annotate({ description: "A score from 0.0 to 1.0 indicating how new or surprising this finding is" }),
+  confidenceScore: Schema.Number.annotate({ description: "A score from 0.0 to 1.0 indicating how confident you are in this finding" }),
+  impactScore: Schema.Number.annotate({ description: "A score from 0.0 to 1.0 indicating the potential security or operational impact" }),
+})
+
+export const Output = Schema.Struct({
+  findingId: Schema.String,
+})
+export type Output = typeof Output.Type
+
+export const toModelOutput = (findingId: string) => {
+  return `Discovery recorded successfully with ID: ${findingId}.`
+}
+
+const layer = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const tools = yield* Tools.Service
+    const graph = yield* KnowledgeGraph
+    const saturation = yield* KnowledgeSaturation
+    const permission = yield* PermissionV2.Service
+
+    yield* tools
+      .register({
+        [name]: Tool.make({
+          description,
+          input: Input,
+          output: Output,
+          toModelOutput: ({ output }) => [
+            { type: "text", text: toModelOutput(output.findingId) },
+          ],
+          execute: (input, context) =>
+            permission
+              .assert({
+                action: "record_discovery",
+                resources: ["*"],
+                sessionID: context.sessionID,
+                agent: context.agent,
+                source: { type: "tool", messageID: context.assistantMessageID, callID: context.toolCallID },
+              })
+              .pipe(
+                Effect.mapError(() => new ToolFailure({ message: "Permission denied: record_discovery" })),
+                Effect.andThen(
+                  graph.addFinding(context.sessionID, {
+                    type: input.type,
+                    data: input.data,
+                    noveltyScore: input.noveltyScore,
+                    confidenceScore: input.confidenceScore,
+                    impactScore: input.impactScore,
+                  }).pipe(Effect.orDie)
+                ),
+                Effect.tap(() => saturation.recordFinding().pipe(Effect.orDie)),
+                Effect.map((findingId) => ({ findingId: findingId as string })),
+              ),
+        }),
+      })
+      .pipe(Effect.orDie)
+  }),
+)
+
+export const node = makeLocationNode({
+  name: "tool/record-discovery",
+  layer,
+  deps: [ToolRegistry.node, PermissionV2.node, KnowledgeGraphNode, KnowledgeSaturationNode],
+})
