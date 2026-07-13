@@ -256,7 +256,7 @@ const layer = Layer.effect(
       }
 
       // Saturation check
-      const isSaturated = yield* saturation.isSaturated()
+      const isSaturated = yield* saturation.isSaturated(session.id)
       if (isSaturated && currentStep > 1) { // allow at least one step
         yield* events.publish(SessionEvent.Step.Ended, {
           sessionID: session.id,
@@ -449,6 +449,7 @@ const layer = Layer.effect(
       yield* failInterruptedTools(input.sessionID)
       let promotion: SessionInput.Delivery | undefined = hasSteer ? "steer" : hasQueue ? "queue" : undefined
       let shouldRun = input.force || hasSteer || hasQueue
+      let activeHypothesisId: string | undefined
       while (shouldRun) {
         let needsContinuation = true
         let step = 1
@@ -508,9 +509,15 @@ const layer = Layer.effect(
           }
           
           if (!needsContinuation) {
+            // The exploration that was running (if any) has now settled.
+            if (activeHypothesisId) {
+              yield* hypothesisQueue.complete(activeHypothesisId, "done")
+              activeHypothesisId = undefined
+            }
             // Check hypothesis queue if no steer/queue pending
             const nextHypothesis = yield* hypothesisQueue.popHighestPriority(input.sessionID)
             if (nextHypothesis) {
+              activeHypothesisId = nextHypothesis.id
               const messageID = SessionMessage.ID.create()
               yield* SessionInput.admit(db, events, {
                 id: messageID,

@@ -69,7 +69,7 @@ const layer = Layer.effectDiscard(
                     impactScore: input.impactScore,
                   }).pipe(Effect.orDie)
                 ),
-                Effect.tap(() => saturation.recordFinding().pipe(Effect.orDie)),
+                Effect.tap(() => saturation.recordFinding(context.sessionID).pipe(Effect.orDie)),
                 Effect.map((findingId) => ({ findingId: findingId as string })),
               ),
         }),

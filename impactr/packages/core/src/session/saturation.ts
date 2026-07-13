@@ -1,5 +1,4 @@
 import { Context, Effect, Layer, Ref, Clock, Duration } from "effect"
-import { DateTime } from "effect"
 
 export interface SaturationConfig {
   readonly windowDuration: Duration.Duration // e.g., 1 hour
@@ -8,15 +7,22 @@ export interface SaturationConfig {
 
 export interface Interface {
   readonly initialize: (config: SaturationConfig) => Effect.Effect<void>
-  readonly recordFinding: () => Effect.Effect<void>
-  readonly isSaturated: () => Effect.Effect<boolean>
-  readonly status: () => Effect.Effect<{
+  readonly recordFinding: (sessionId: string) => Effect.Effect<void>
+  readonly isSaturated: (sessionId: string) => Effect.Effect<boolean>
+  readonly status: (sessionId: string) => Effect.Effect<{
     discoveryRate: number
     saturated: boolean
   }>
 }
 
-export class KnowledgeSaturation extends Context.Service<KnowledgeSaturation, Interface>()("@impactr-ai/core/session/saturation") {}
+interface SessionState {
+  readonly startedAt: number
+  readonly findings: number[] // timestamps, pruned to the active window
+}
+
+export class KnowledgeSaturation extends Context.Service<KnowledgeSaturation, Interface>()(
+  "@impactr-ai/core/session/saturation",
+) {}
 
 export const layer = Layer.effect(
   KnowledgeSaturation,
@@ -26,63 +32,58 @@ export const layer = Layer.effect(
         windowDuration: Duration.hours(1),
         minMeaningfulFindings: 10,
       } as SaturationConfig,
-      findings: [] as number[], // timestamps
+      sessions: new Map<string, SessionState>(),
     })
 
-    const cleanOldFindings = (currentTime: number, window: Duration.Duration, findings: number[]) => {
-      const cutoff = currentTime - Duration.toMillis(window)
-      return findings.filter(t => t >= cutoff)
+    const prune = (now: number, window: Duration.Duration, findings: number[]) => {
+      const cutoff = now - Duration.toMillis(window)
+      return findings.filter((t) => t >= cutoff)
     }
 
-    const checkSaturated = Effect.gen(function* () {
-      const now = yield* Clock.currentTimeMillis
-      const s = yield* Ref.get(state)
-      
-      if (s.findings.length === 0) return false
-      
-      const windowMillis = Duration.toMillis(s.config.windowDuration)
-      const firstFinding = s.findings[0]
-      
-      if (now - firstFinding < windowMillis) {
-         return false
-      }
+    const checkSaturated = (sessionId: string) =>
+      Effect.gen(function* () {
+        const now = yield* Clock.currentTimeMillis
+        const s = yield* Ref.get(state)
+        const session = s.sessions.get(sessionId)
+        if (!session || session.findings.length === 0) return false
 
-      const recentFindings = cleanOldFindings(now, s.config.windowDuration, s.findings)
-      return recentFindings.length < s.config.minMeaningfulFindings
-    })
+        const windowMillis = Duration.toMillis(s.config.windowDuration)
+        // Not enough history yet: keep exploring until at least one full window has elapsed.
+        if (now - session.startedAt < windowMillis) return false
+
+        const recent = prune(now, s.config.windowDuration, session.findings)
+        return recent.length < s.config.minMeaningfulFindings
+      })
 
     return KnowledgeSaturation.of({
-      initialize: (config: SaturationConfig) =>
-        Ref.update(state, (s) => ({
-          ...s,
-          config,
-        })),
+      initialize: (config: SaturationConfig) => Ref.update(state, (s) => ({ ...s, config })),
 
-      recordFinding: () =>
+      recordFinding: (sessionId: string) =>
         Effect.gen(function* () {
           const now = yield* Clock.currentTimeMillis
-          yield* Ref.update(state, (s) => ({
-            ...s,
-            findings: [...s.findings, now],
-          }))
+          yield* Ref.update(state, (s) => {
+            const existing = s.sessions.get(sessionId)
+            const startedAt = existing?.startedAt ?? now
+            const findings = prune(now, s.config.windowDuration, [...(existing?.findings ?? []), now])
+            const sessions = new Map(s.sessions)
+            sessions.set(sessionId, { startedAt, findings })
+            return { ...s, sessions }
+          })
         }),
 
-      isSaturated: () => checkSaturated,
+      isSaturated: (sessionId: string) => checkSaturated(sessionId),
 
-      status: () =>
+      status: (sessionId: string) =>
         Effect.gen(function* () {
           const now = yield* Clock.currentTimeMillis
           const s = yield* Ref.get(state)
-          const recentFindings = cleanOldFindings(now, s.config.windowDuration, s.findings)
-          const saturated = yield* checkSaturated
-
-          return {
-            discoveryRate: recentFindings.length,
-            saturated
-          }
+          const session = s.sessions.get(sessionId)
+          const recent = session ? prune(now, s.config.windowDuration, session.findings) : []
+          const saturated = yield* checkSaturated(sessionId)
+          return { discoveryRate: recent.length, saturated }
         }),
     })
-  })
+  }),
 )
 
 import { makeGlobalNode } from "../effect/app-node"

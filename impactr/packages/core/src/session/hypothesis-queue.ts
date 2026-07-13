@@ -11,10 +11,13 @@ export interface Hypothesis {
   readonly priority: number
 }
 
+export type HypothesisOutcome = "done" | "failed"
+
 export interface Interface {
   readonly push: (sessionId: string, hypothesis: Omit<Hypothesis, "id">) => Effect.Effect<string>
   readonly popHighestPriority: (sessionId: string) => Effect.Effect<Hypothesis | undefined>
   readonly peekAll: (sessionId: string) => Effect.Effect<ReadonlyArray<Hypothesis>>
+  readonly complete: (id: string, outcome: HypothesisOutcome) => Effect.Effect<void>
 }
 
 export class HypothesisQueue extends Context.Service<HypothesisQueue, Interface>()("@impactr-ai/core/session/hypothesis-queue") {}
@@ -81,6 +84,12 @@ export const layer = Layer.effect(
             priority: r.priority,
           }))
         }),
+
+      complete: (id, outcome) =>
+        db.update(HypothesisQueueTable)
+          .set({ status: outcome })
+          .where(eq(HypothesisQueueTable.id, id))
+          .pipe(Effect.orDie, Effect.asVoid),
     })
   })
 )
