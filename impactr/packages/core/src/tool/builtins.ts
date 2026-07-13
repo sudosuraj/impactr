@@ -18,6 +18,8 @@ import { QueueHypothesisTool } from "./queue-hypothesis"
 import { WriteTool } from "./write"
 import { TestAndFixTool } from "./test-and-fix"
 import { RunAgentTool } from "./run-agent"
+import { RepoCloneTool } from "./repo-clone"
+import { DraftVulnerabilityTool } from "./draft-vulnerability"
 
 /**
  * Composes only the shipped Location-scoped built-in tool transforms.
@@ -52,5 +54,7 @@ export const node = makeLocationNode({
     WriteTool.node,
     TestAndFixTool.node,
     RunAgentTool.node,
+    RepoCloneTool.node,
+    DraftVulnerabilityTool.node,
   ],
 })

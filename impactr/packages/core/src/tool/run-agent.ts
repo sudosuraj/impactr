@@ -24,6 +24,7 @@ import { Tool } from "./tool"
 import { Tools } from "./tools"
 import { SessionStore } from "../session/store"
 import { SessionRunnerModel } from "../session/runner/model"
+import { BackgroundJob } from "../background-job"
 
 export const name = "run_agent"
 
@@ -33,6 +34,9 @@ export const Input = Schema.Struct({
   }),
   prompt: Schema.String.annotate({
     description: "The specific instruction or task to delegate to the subagent.",
+  }),
+  background: Schema.Boolean.pipe(Schema.optional).annotate({
+    description: "If true, the subagent will run asynchronously in the background, allowing you to continue immediately.",
   }),
 })
 
@@ -53,6 +57,7 @@ const layer = Layer.effectDiscard(
     const store = yield* SessionStore.Service
     const models = yield* SessionRunnerModel.Service
     const toolRegistry = yield* ToolRegistry.Service
+    const backgroundJobs = yield* BackgroundJob.Service
 
     const loadSystemContext = (agent: AgentV2.Selection) =>
       Effect.all([systemContext.load(), skillGuidance.load(agent), referenceGuidance.load()], {
@@ -75,85 +80,99 @@ const layer = Layer.effectDiscard(
               if (!session) return yield* Effect.fail(new Error("Session not found"))
               const model = yield* models.resolve(session)
 
-              let currentStep = 1
-              let messages: Message[] = [Message.user(input.prompt)]
-              let finalOutput = ""
-              let settled = false
+              const runAgentLoop = Effect.gen(function* () {
+                let currentStep = 1
+                let messages: Message[] = [Message.user(input.prompt)]
+                let finalOutput = ""
+                let settled = false
 
-              while (!settled && currentStep <= 5) {
-                const systemContextCombined = yield* loadSystemContext(subagent)
-                const generation = yield* SystemContext.initialize(systemContextCombined).pipe(Effect.orDie)
-                const request = LLM.request({
-                  model,
-                  system: [subagent.info?.system, generation.baseline]
-                    .filter((part): part is string => part !== undefined && part.length > 0)
-                    .map(SystemPart.make),
-                  messages,
-                  tools: toolMaterialization?.definitions ?? [],
-                })
+                while (!settled && currentStep <= 5) {
+                  const systemContextCombined = yield* loadSystemContext(subagent)
+                  const generation = yield* SystemContext.initialize(systemContextCombined).pipe(Effect.orDie)
+                  const request = LLM.request({
+                    model,
+                    system: [subagent.info?.system, generation.baseline]
+                      .filter((part): part is string => part !== undefined && part.length > 0)
+                      .map(SystemPart.make),
+                    messages,
+                    tools: toolMaterialization?.definitions ?? [],
+                  })
 
-                let textOutput = ""
-                const toolCalls: ToolCallPart[] = []
-                const toolResultMessages: Message[] = []
+                  let textOutput = ""
+                  const toolCalls: ToolCallPart[] = []
+                  const toolResultMessages: Message[] = []
 
-                yield* llm.stream(request).pipe(
-                  Stream.runForEach((event) =>
-                    Effect.gen(function* () {
-                      if (LLMEvent.is.textDelta(event)) {
-                        textOutput += event.text
-                      }
-                      if (event.type === "tool-call") {
-                        toolCalls.push(
-                          ToolCallPart.make({
-                            id: event.id,
-                            name: event.name,
-                            input: event.input,
-                          }),
-                        )
-                        const settlement = yield* toolMaterialization.settle({
-                          sessionID: context.sessionID,
-                          agent: subagent.id,
-                          assistantMessageID: context.assistantMessageID,
-                          call: event,
-                        }).pipe(
-                          Effect.catch(() =>
-                            Effect.succeed({ result: { type: "error" as const, value: "Tool execution failed" } }),
-                          ),
-                        )
-                        toolResultMessages.push(
-                          Message.tool(
-                            ToolResultPart.make({
+                  yield* llm.stream(request).pipe(
+                    Stream.runForEach((event) =>
+                      Effect.gen(function* () {
+                        if (LLMEvent.is.textDelta(event)) {
+                          textOutput += event.text
+                        }
+                        if (event.type === "tool-call") {
+                          toolCalls.push(
+                            ToolCallPart.make({
                               id: event.id,
                               name: event.name,
-                              result: settlement.result,
+                              input: event.input,
                             }),
-                          ),
-                        )
-                      }
-                    }),
-                  ),
-                )
+                          )
+                          const settlement = yield* toolMaterialization.settle({
+                            sessionID: context.sessionID,
+                            agent: subagent.id,
+                            assistantMessageID: context.assistantMessageID,
+                            call: event,
+                          }).pipe(
+                            Effect.catch(() =>
+                              Effect.succeed({ result: { type: "error" as const, value: "Tool execution failed" } }),
+                            ),
+                          )
+                          toolResultMessages.push(
+                            Message.tool(
+                              ToolResultPart.make({
+                                id: event.id,
+                                name: event.name,
+                                result: settlement.result,
+                              }),
+                            ),
+                          )
+                        }
+                      }),
+                    ),
+                  )
 
-                if (toolCalls.length > 0) {
-                  messages = [
-                    ...messages,
-                    Message.make({
-                      role: "assistant",
-                      content: [
-                        ...(textOutput ? [{ type: "text" as const, text: textOutput }] : []),
-                        ...toolCalls,
-                      ],
-                    }),
-                    ...toolResultMessages,
-                  ]
-                  currentStep++
-                } else {
-                  finalOutput = textOutput
-                  settled = true
+                  if (toolCalls.length > 0) {
+                    messages = [
+                      ...messages,
+                      Message.make({
+                        role: "assistant",
+                        content: [
+                          ...(textOutput ? [{ type: "text" as const, text: textOutput }] : []),
+                          ...toolCalls,
+                        ],
+                      }),
+                      ...toolResultMessages,
+                    ]
+                    currentStep++
+                  } else {
+                    finalOutput = textOutput
+                    settled = true
+                  }
                 }
-              }
 
-              return { output: finalOutput }
+                return finalOutput
+              })
+
+              if (input.background) {
+                const job = yield* backgroundJobs.start({
+                  type: "subagent",
+                  title: `Subagent: ${input.agent}`,
+                  run: runAgentLoop,
+                })
+                return { output: `Subagent started asynchronously with background job ID: ${job.id}` }
+              } else {
+                const finalOutput = yield* runAgentLoop
+                return { output: finalOutput }
+              }
             }).pipe(
               Effect.mapError((err) => new ToolFailure({ message: err instanceof Error ? err.message : String(err) })),
             ),
@@ -176,5 +195,6 @@ export const node = makeLocationNode({
     ReferenceGuidance.node,
     SessionStore.node,
     SessionRunnerModel.node,
+    BackgroundJob.node,
   ],
 })
