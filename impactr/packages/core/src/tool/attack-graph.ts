@@ -133,20 +133,41 @@ const layer = Layer.effectDiscard(
                       }
                       case "query": {
                         const graphState = yield* graph.getGraph(context.sessionID)
-                        const stuck = Object.values(graphState.nodes).filter((n) => n.loopCount >= LOOP_THRESHOLD)
+                        const nodes = Object.values(graphState.nodes)
+                        // A bounded, decision-oriented digest. Dumping the full
+                        // node/edge set as JSON grows the model context without
+                        // bound as an engagement runs; use get_node for detail.
+                        const byStatus = nodes.reduce<Record<string, number>>((acc, n) => {
+                          acc[n.status] = (acc[n.status] ?? 0) + 1
+                          return acc
+                        }, {})
+                        const statusLine = Object.entries(byStatus)
+                          .map(([status, count]) => `${status}: ${count}`)
+                          .join(", ")
+                        const list = (label: string, ids: string[]) =>
+                          ids.length === 0
+                            ? ""
+                            : `\n${label}:\n${ids.slice(0, 15).map((id) => `- ${id}`).join("\n")}${
+                                ids.length > 15 ? `\n… and ${ids.length - 15} more` : ""
+                              }`
+                        const compromised = nodes.filter((n) => n.status === "compromised").map((n) => n.id)
+                        const active = nodes
+                          .filter((n) => n.status === "enumerating" || n.status === "exploiting")
+                          .map((n) => n.id)
+                        const stuck = nodes.filter((n) => n.loopCount >= LOOP_THRESHOLD)
                         const stuckSection =
                           stuck.length === 0
                             ? ""
-                            : `\n\n⚠ Stuck nodes (loopCount >= ${LOOP_THRESHOLD}):\n${stuck
+                            : `\n⚠ Stuck (loopCount >= ${LOOP_THRESHOLD}):\n${stuck
+                                .slice(0, 15)
                                 .map((n) => `- ${n.id} (${n.loopCount})`)
                                 .join("\n")}`
-                        summary = `Attack Graph Summary:\nTotal Nodes: ${
-                          Object.keys(graphState.nodes).length
-                        }\nTotal Edges: ${graphState.edges.length}\n\nNodes:\n${JSON.stringify(
-                          graphState.nodes,
-                          null,
-                          2,
-                        )}\n\nEdges:\n${JSON.stringify(graphState.edges, null, 2)}${stuckSection}`
+                        summary = `Attack Graph Summary:\nTotal Nodes: ${nodes.length} | Total Edges: ${
+                          graphState.edges.length
+                        }\nStatus: ${statusLine || "none"}${list("Compromised", compromised)}${list(
+                          "Active",
+                          active,
+                        )}${stuckSection}\n\n(Use get_node <id> for a node's full detail and neighbors.)`
                         break
                       }
                     }

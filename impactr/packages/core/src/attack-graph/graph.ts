@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect"
-import { and, eq, or } from "drizzle-orm"
+import { and, eq, or, inArray } from "drizzle-orm"
 import { Database } from "../database/database"
 import { makeGlobalNode } from "../effect/app-node"
 import { GraphState, Node, Edge, NodeStatus } from "./schema"
@@ -160,8 +160,16 @@ export const layer = Layer.effect(
           const neighborIds = [
             ...new Set(edgeRows.map((row) => (row.source === id ? row.target : row.source))),
           ]
-          const neighbors = yield* Effect.forEach(neighborIds, (neighborId) => readNode(sessionId, neighborId))
-          return neighbors.filter((row): row is NodeRow => row !== undefined).map(toNode)
+          if (neighborIds.length === 0) return []
+          // Fetch all neighbors in one query rather than one round-trip per id.
+          const rows = yield* db
+            .select()
+            .from(AttackGraphNodeTable)
+            .where(
+              and(eq(AttackGraphNodeTable.session_id, sessionId as any), inArray(AttackGraphNodeTable.id, neighborIds)),
+            )
+            .pipe(Effect.orDie)
+          return rows.map(toNode)
         }),
     })
   }),

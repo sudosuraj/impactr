@@ -2,7 +2,7 @@ import { Effect, Context, Layer } from "effect"
 import { Database } from "../database/database"
 import { GraphNodeTable } from "./sql"
 import { makeGlobalNode } from "../effect/app-node"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 
 export interface Finding {
   readonly id: string
@@ -60,22 +60,25 @@ export const layer = Layer.effect(
 
       summarize: (sessionId, limit) =>
         Effect.gen(function* () {
+          // Rank and bound in SQLite so an idle->pop transition never scans and
+          // sorts the whole findings table as an engagement accumulates them.
           const nodes = yield* db.select()
             .from(GraphNodeTable)
             .where(eq(GraphNodeTable.session_id, sessionId as any))
+            .orderBy(
+              sql`${GraphNodeTable.novelty_score} * ${GraphNodeTable.impact_score} * ${GraphNodeTable.confidence_score} desc`,
+            )
+            .limit(limit)
             .pipe(Effect.orDie)
-          return nodes
-            .map((n) => ({
-              id: n.id,
-              type: n.type,
-              data: n.data,
-              noveltyScore: n.novelty_score,
-              confidenceScore: n.confidence_score,
-              impactScore: n.impact_score,
-              potential: n.novelty_score * n.impact_score * n.confidence_score,
-            }))
-            .sort((a, b) => b.potential - a.potential)
-            .slice(0, limit)
+          return nodes.map((n) => ({
+            id: n.id,
+            type: n.type,
+            data: n.data,
+            noveltyScore: n.novelty_score,
+            confidenceScore: n.confidence_score,
+            impactScore: n.impact_score,
+            potential: n.novelty_score * n.impact_score * n.confidence_score,
+          }))
         }),
 
       getPotentialScore: (findingId) =>
