@@ -8,7 +8,7 @@ import { Global } from "@impactr-ai/core/global"
 import { Filesystem } from "@/util/filesystem"
 import * as ConfigPaths from "@/config/paths"
 
-const TUI_SCHEMA_URL = "https://impactr.ai/tui.json"
+const TUI_SCHEMA_URL = "https://impactr.dev/tui.json"
 
 const decodeTheme = Schema.decodeUnknownOption(Schema.String)
 const decodeRecord = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown))
@@ -69,10 +69,10 @@ export async function migrateTuiConfig(input: MigrateInput) {
 
 function normalizeTui(data: Record<string, unknown>):
   | {
-      scroll_speed: number | undefined
-      scroll_acceleration: { enabled: boolean } | undefined
-      diff_style: "auto" | "stacked" | undefined
-    }
+    scroll_speed: number | undefined
+    scroll_acceleration: { enabled: boolean } | undefined
+    diff_style: "auto" | "stacked" | undefined
+  }
   | undefined {
   const parsed = {
     scroll_speed: Option.getOrUndefined(decodeScrollSpeed(data.scroll_speed)),
@@ -92,8 +92,8 @@ async function backupAndStripLegacy(file: string, source: string) {
   const backed = hasBackup
     ? true
     : await Filesystem.write(backup, source)
-        .then(() => true)
-        .catch(() => false)
+      .then(() => true)
+      .catch(() => false)
   if (!backed) return false
 
   const text = ["theme", "keybinds", "tui"].reduce((acc, key) => {

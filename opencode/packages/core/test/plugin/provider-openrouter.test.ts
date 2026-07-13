@@ -33,13 +33,13 @@ describe("OpenRouterPlugin", () => {
           provider.api = { type: "aisdk", package: "@openrouter/ai-sdk-provider" }
           provider.request = { headers: { Existing: "value" }, body: {} }
         })
-        catalog.provider.update(ProviderV2.ID.make("nvidia"), () => {})
+        catalog.provider.update(ProviderV2.ID.make("nvidia"), () => { })
       })
       yield* addPlugin()
 
       expect((yield* catalog.provider.get(ProviderV2.ID.openrouter))?.request.headers).toEqual({
         Existing: "value",
-        "HTTP-Referer": "https://impactr.ai/",
+        "HTTP-Referer": "https://impactr.dev/",
         "X-Title": "impactr",
       })
       expect((yield* catalog.provider.get(ProviderV2.ID.make("nvidia")))?.request.headers).toEqual({})
@@ -81,10 +81,10 @@ describe("OpenRouterPlugin", () => {
         catalog.provider.update(ProviderV2.ID.openrouter, (provider) => {
           provider.api = { type: "aisdk", package: "@openrouter/ai-sdk-provider" }
         })
-        catalog.provider.update(ProviderV2.ID.openai, () => {})
-        catalog.model.update(ProviderV2.ID.openrouter, ModelV2.ID.make("openai/gpt-5-chat"), () => {})
-        catalog.model.update(ProviderV2.ID.openrouter, ModelV2.ID.make("openai/gpt-5"), () => {})
-        catalog.model.update(ProviderV2.ID.openai, ModelV2.ID.make("openai/gpt-5-chat"), () => {})
+        catalog.provider.update(ProviderV2.ID.openai, () => { })
+        catalog.model.update(ProviderV2.ID.openrouter, ModelV2.ID.make("openai/gpt-5-chat"), () => { })
+        catalog.model.update(ProviderV2.ID.openrouter, ModelV2.ID.make("openai/gpt-5"), () => { })
+        catalog.model.update(ProviderV2.ID.openai, ModelV2.ID.make("openai/gpt-5-chat"), () => { })
       })
       yield* addPlugin()
 
@@ -100,8 +100,8 @@ describe("OpenRouterPlugin", () => {
     Effect.gen(function* () {
       const catalog = yield* Catalog.Service
       yield* catalog.transform((catalog) => {
-        catalog.provider.update(ProviderV2.ID.make("custom-openrouter"), () => {})
-        catalog.model.update(ProviderV2.ID.make("custom-openrouter"), ModelV2.ID.make("gpt-5-chat-latest"), () => {})
+        catalog.provider.update(ProviderV2.ID.make("custom-openrouter"), () => { })
+        catalog.model.update(ProviderV2.ID.make("custom-openrouter"), ModelV2.ID.make("gpt-5-chat-latest"), () => { })
       })
       yield* addPlugin()
       expect(

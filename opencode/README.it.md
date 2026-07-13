@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://impactr.ai">
+  <a href="https://impactr.dev">
     <picture>
       <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
@@ -9,7 +9,7 @@
 </p>
 <p align="center">L’agente di coding AI open source.</p>
 <p align="center">
-  <a href="https://impactr.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
+  <a href="https://impactr.dev/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
   <a href="https://www.npmjs.com/package/impactr-ai"><img alt="npm" src="https://img.shields.io/npm/v/impactr-ai?style=flat-square" /></a>
   <a href="https://github.com/anomalyco/impactr/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/impactr/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
@@ -39,7 +39,7 @@
   <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
-[![Impactr Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://impactr.ai)
+[![Impactr Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://impactr.dev)
 
 ---
 
@@ -47,7 +47,7 @@
 
 ```bash
 # YOLO
-curl -fsSL https://impactr.ai/install | bash
+curl -fsSL https://impactr.dev/install | bash
 
 # Package manager
 npm i -g impactr-ai@latest        # oppure bun/pnpm/yarn
@@ -66,7 +66,7 @@ nix run nixpkgs#impactr           # oppure github:anomalyco/impactr per l’ulti
 
 ### App Desktop (BETA)
 
-Impactr è disponibile anche come applicazione desktop. Puoi scaricarla direttamente dalla [pagina delle release](https://github.com/anomalyco/impactr/releases) oppure da [impactr.ai/download](https://impactr.ai/download).
+Impactr è disponibile anche come applicazione desktop. Puoi scaricarla direttamente dalla [pagina delle release](https://github.com/anomalyco/impactr/releases) oppure da [impactr.dev/download](https://impactr.dev/download).
 
 | Piattaforma           | Download                           |
 | --------------------- | ---------------------------------- |
@@ -93,8 +93,8 @@ Lo script di installazione rispetta il seguente ordine di priorità per il perco
 
 ```bash
 # Esempi
-IMPACTR_INSTALL_DIR=/usr/local/bin curl -fsSL https://impactr.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://impactr.ai/install | bash
+IMPACTR_INSTALL_DIR=/usr/local/bin curl -fsSL https://impactr.dev/install | bash
+XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://impactr.dev/install | bash
 ```
 
 ### Agenti
@@ -110,11 +110,11 @@ Impactr include due agenti integrati tra cui puoi passare usando il tasto `Tab`.
 È inoltre incluso un sotto-agente **general** per ricerche complesse e attività multi-step.
 Viene utilizzato internamente e può essere invocato usando `@general` nei messaggi.
 
-Scopri di più sugli [agenti](https://impactr.ai/docs/agents).
+Scopri di più sugli [agenti](https://impactr.dev/docs/agents).
 
 ### Documentazione
 
-Per maggiori informazioni su come configurare Impactr, [**consulta la nostra documentazione**](https://impactr.ai/docs).
+Per maggiori informazioni su come configurare Impactr, [**consulta la nostra documentazione**](https://impactr.dev/docs).
 
 ### Contribuire
 

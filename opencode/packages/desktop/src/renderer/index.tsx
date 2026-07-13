@@ -90,7 +90,7 @@ function getLastActiveUrl(windowID: string) {
   try {
     const value = localStorage.getItem(windowLastActiveUrlKey(windowID))
     if (value?.startsWith("/") && !value.startsWith("//")) return value
-  } catch {}
+  } catch { }
   return "/"
 }
 
@@ -98,7 +98,7 @@ function setLastActiveUrl(windowID: string, value: string) {
   if (typeof localStorage !== "object") return
   try {
     localStorage.setItem(windowLastActiveUrlKey(windowID), value)
-  } catch {}
+  } catch { }
 }
 
 function DesktopMemoryRouter(props: BaseRouterProps & { windowID: string }) {
@@ -249,7 +249,7 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
 
       const notification = new Notification(title, {
         body: description ?? "",
-        icon: "https://impactr.ai/favicon-96x96-v3.png",
+        icon: "https://impactr.dev/favicon-96x96-v3.png",
       })
       notification.onclick = () => {
         void window.api.showWindow()

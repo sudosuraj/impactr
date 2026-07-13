@@ -41,7 +41,7 @@ function withProject<A, E, R>(source: string, self: Effect.Effect<A, E, R>) {
             path.join(test.directory, "impactr.json"),
             JSON.stringify(
               {
-                $schema: "https://impactr.ai/config.json",
+                $schema: "https://impactr.dev/config.json",
                 plugin: [pathToFileURL(file).href],
               },
               null,

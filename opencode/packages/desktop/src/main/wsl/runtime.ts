@@ -155,9 +155,9 @@ function runInteractiveCommand(command: string, args: string[], opts: RunWslOpti
     }
     const abortCleanup = opts.signal
       ? (() => {
-          opts.signal?.addEventListener("abort", abortHandler, { once: true })
-          return () => opts.signal?.removeEventListener("abort", abortHandler)
-        })()
+        opts.signal?.addEventListener("abort", abortHandler, { once: true })
+        return () => opts.signal?.removeEventListener("abort", abortHandler)
+      })()
       : undefined
 
     child.onData((data: string) => {
@@ -263,7 +263,7 @@ export async function installWslImpactr(version: string, distro: string, opts?: 
   return runInteractiveCommand(
     resolveSystem32Command("wsl.exe"),
     wslArgs(
-      ["bash", "-lc", `curl -fsSL https://impactr.ai/install | bash -s -- --version ${shellEscape(version)}`],
+      ["bash", "-lc", `curl -fsSL https://impactr.dev/install | bash -s -- --version ${shellEscape(version)}`],
       distro,
     ),
     withTimeout(opts, DEFAULT_WSL_INSTALL_TIMEOUT_MS),

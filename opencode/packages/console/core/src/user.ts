@@ -83,11 +83,11 @@ export namespace User {
             name: "",
             ...(accountID
               ? {
-                  accountID,
-                }
+                accountID,
+              }
               : {
-                  email,
-                }),
+                email,
+              }),
             workspaceID,
             role,
             monthlyLimit,
@@ -147,7 +147,7 @@ export namespace User {
             // @ts-ignore
             InviteEmail({
               inviter: emailInfo.inviterEmail,
-              assetsUrl: `https://impactr.ai/email`,
+              assetsUrl: `https://impactr.dev/email`,
               workspaceID: workspaceID,
               workspaceName: emailInfo.workspaceName,
             }),

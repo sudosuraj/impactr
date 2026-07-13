@@ -131,17 +131,17 @@ export async function handler(
     const allowedRegions = authInfo?.region
       ? authInfo.region
       : await (async () => {
-          if (!authInfo) return
-          return Actor.provide("system", { workspaceID: authInfo.workspaceID }, () =>
-            Workspace.setDefaultRegion({ country: countryFromRequest(input.request) }),
-          )
-        })()
+        if (!authInfo) return
+        return Actor.provide("system", { workspaceID: authInfo.workspaceID }, () =>
+          Workspace.setDefaultRegion({ country: countryFromRequest(input.request) }),
+        )
+      })()
     /*
     if (true) {
       if (!allowedRegions?.includes("unavailable"))
         throw new RegionError(
           t("zen.api.error.regionNotAllowed", {
-            consoleGoUrl: `https://impactr.ai/workspace/${authInfo.workspaceID}/go`,
+            consoleGoUrl: `https://impactr.dev/workspace/${authInfo.workspaceID}/go`,
           }),
         )
     }
@@ -455,7 +455,7 @@ export async function handler(
         logger.metric({
           "error.cause2": JSON.stringify(error.cause),
         })
-      } catch {}
+      } catch { }
     }
 
     if (error instanceof RegionError)
@@ -503,9 +503,9 @@ export async function handler(
           metadata:
             error instanceof GoUsageLimitError
               ? {
-                  workspace: error.workspace,
-                  limitName: error.limitName,
-                }
+                workspace: error.workspace,
+                limitName: error.limitName,
+              }
               : {},
         }),
         { status: 429, headers },
@@ -544,7 +544,7 @@ export async function handler(
       throw new ModelError(
         `${t("zen.api.error.trialEnded", {
           model: modelData.name,
-          link: "https://impactr.ai/go",
+          link: "https://impactr.dev/go",
         })}`,
       )
 
@@ -566,9 +566,9 @@ export async function handler(
     modelTpsLimits: Record<string, { qualify: number; unqualify: number }> | undefined,
     providerBudget:
       | {
-          qualify: (providerId: string, priority: number) => boolean
-          prefer: (providerId: string, priority: number) => boolean
-        }
+        qualify: (providerId: string, priority: number) => boolean
+        prefer: (providerId: string, priority: number) => boolean
+      }
       | undefined,
   ) {
     const modelProvider = (() => {
@@ -738,9 +738,9 @@ export async function handler(
           ProviderTable,
           modelInfo.byokProvider
             ? and(
-                eq(ProviderTable.workspaceID, KeyTable.workspaceID),
-                eq(ProviderTable.provider, modelInfo.byokProvider),
-              )
+              eq(ProviderTable.workspaceID, KeyTable.workspaceID),
+              eq(ProviderTable.provider, modelInfo.byokProvider),
+            )
             : sql`false`,
         )
         .leftJoin(
@@ -867,7 +867,7 @@ export async function handler(
     // Validate lite subscription billing
     if (opts.modelList === "lite" && authInfo.billing.lite && authInfo.lite) {
       try {
-        const consoleGoUrl = `https://impactr.ai/workspace/${authInfo.workspaceID}/go`
+        const consoleGoUrl = `https://impactr.dev/workspace/${authInfo.workspaceID}/go`
         const sub = authInfo.lite
         const liteData = LiteData.getLimits()
 
@@ -938,8 +938,8 @@ export async function handler(
 
     // Validate pay as you go billing
     const billing = authInfo.billing
-    const billingUrl = `https://impactr.ai/workspace/${authInfo.workspaceID}/billing`
-    const membersUrl = `https://impactr.ai/workspace/${authInfo.workspaceID}/members`
+    const billingUrl = `https://impactr.dev/workspace/${authInfo.workspaceID}/billing`
+    const membersUrl = `https://impactr.dev/workspace/${authInfo.workspaceID}/members`
     if (!billing.paymentMethodID && billing.balance <= 0)
       throw new CreditsError(t("zen.api.error.noPaymentMethod", { billingUrl }))
     if (billing.balance <= 0) throw new CreditsError(t("zen.api.error.insufficientBalance", { billingUrl }))
@@ -1006,7 +1006,7 @@ export async function handler(
 
     const modelCost =
       modelInfo.cost200K &&
-      inputTokens + (cacheReadTokens ?? 0) + (cacheWrite5mTokens ?? 0) + (cacheWrite1hTokens ?? 0) > 200_000
+        inputTokens + (cacheReadTokens ?? 0) + (cacheWrite5mTokens ?? 0) + (cacheWrite1hTokens ?? 0) > 200_000
         ? modelInfo.cost200K
         : modelInfo.cost
 

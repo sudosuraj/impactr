@@ -3,7 +3,7 @@ title: Enterprise
 description: Using Impactr securely in your organization.
 ---
 
-export const enterprise = "https://impactr.ai/enterprise"
+export const enterprise = "https://impactr.dev/enterprise"
 
 Impactr Enterprise is for organizations that want to ensure that their code and data never leaves their infrastructure. It can do this by using a centralized config that integrates with your SSO and internal AI gateway.
 
@@ -37,7 +37,7 @@ The only caveat here is the optional `/share` feature.
 
 #### Sharing conversations
 
-If a user enables the `/share` feature, the conversation and the data associated with it are sent to the service we use to host these share pages at impactr.ai.
+If a user enables the `/share` feature, the conversation and the data associated with it are sent to the service we use to host these share pages at impactr.dev.
 
 The data is currently served through our CDN's edge network, and is cached on the edge near your users.
 
@@ -45,7 +45,7 @@ We recommend you disable this for your trial.
 
 ```json title="impactr.json"
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "share": "disabled"
 }
 ```

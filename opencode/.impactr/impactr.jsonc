@@ -1,5 +1,5 @@
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {},
   "permission": {},
   "references": {

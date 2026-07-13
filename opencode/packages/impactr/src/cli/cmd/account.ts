@@ -15,7 +15,7 @@ const dim = (value: string) => UI.Style.TEXT_DIM + value + UI.Style.TEXT_NORMAL
 
 const activeSuffix = (isActive: boolean) => (isActive ? dim(" (active)") : "")
 
-export const defaultConsoleUrl = "https://console.impactr.ai"
+export const defaultConsoleUrl = "https://console.impactr.dev"
 
 export const formatAccountLabel = (account: { email: string; url: string }, isActive: boolean) =>
   `${account.email} ${dim(account.url)}${activeSuffix(isActive)}`
@@ -260,5 +260,5 @@ export const ConsoleCommand = cmd({
         describe: "open active console account",
       })
       .demandCommand(),
-  async handler() {},
+  async handler() { },
 })

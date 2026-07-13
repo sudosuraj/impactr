@@ -281,7 +281,7 @@ async function assertImpactrConnected() {
       })
       connected = true
       break
-    } catch {}
+    } catch { }
     await sleep(300)
   } while (retry++ < 30)
 
@@ -363,7 +363,7 @@ function useIssueId() {
 }
 
 function useShareUrl() {
-  return isMock() ? "https://dev.impactr.ai" : "https://impactr.ai"
+  return isMock() ? "https://dev.impactr.dev" : "https://impactr.dev"
 }
 
 async function getAccessToken() {
@@ -374,7 +374,7 @@ async function getAccessToken() {
 
   let response
   if (isMock()) {
-    response = await fetch("https://api.impactr.ai/exchange_github_app_token_with_pat", {
+    response = await fetch("https://api.impactr.dev/exchange_github_app_token_with_pat", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${useEnvMock().mockToken}`,
@@ -383,7 +383,7 @@ async function getAccessToken() {
     })
   } else {
     const oidcToken = await core.getIDToken("impactr-github-action")
-    response = await fetch("https://api.impactr.ai/exchange_github_app_token", {
+    response = await fetch("https://api.impactr.dev/exchange_github_app_token", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${oidcToken}`,

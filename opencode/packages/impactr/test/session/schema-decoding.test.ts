@@ -240,7 +240,7 @@ describe("SessionStatus.Info", () => {
         title: "Free limit reached",
         message: "Subscribe to Impactr Go.",
         label: "subscribe",
-        link: "https://impactr.ai/go",
+        link: "https://impactr.dev/go",
       },
       next: 500,
     }

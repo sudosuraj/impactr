@@ -31,14 +31,14 @@ Your output must be:
 </rules>
 
 <examples>
-"debug 500 errors in production" → Debugging production 500 errors
-"refactor user service" → Refactoring user service
-"why is app.js failing" → app.js failure investigation
-"implement rate limiting" → Rate limiting implementation
-"how do I connect postgres to my API" → Postgres API connection
-"best practices for React hooks" → React hooks best practices
-"@src/auth.ts can you add refresh token support" → Auth refresh token support
-"@utils/parser.ts this is broken" → Parser bug fix
-"look at @config.json" → Config review
-"@App.tsx add dark mode toggle" → Dark mode toggle in App
+"run directory brute-force on staging" → Directory brute-force on staging
+"found sql injection in login parameter" → SQLi discovery in login
+"scan for open ports on 10.0.0.5" → Port scan 10.0.0.5
+"bypass rate limiting on api/v1" → Rate limit bypass on API
+"enumerate subdomains for example.com" → Subdomain enumeration example.com
+"check for xss in search field" → XSS check in search
+"dump database tables using sqli" → Database extraction via SQLi
+"verify authenticated access to admin panel" → Admin panel access verification
+"analyze nmap output for vulnerabilities" → Nmap output analysis
+"write pentest report for web app" → Web app pentest report
 </examples>

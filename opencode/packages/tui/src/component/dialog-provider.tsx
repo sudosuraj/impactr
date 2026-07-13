@@ -37,12 +37,12 @@ type ProviderOptionBase = {
 
 type ProviderOption =
   | (ProviderOptionBase & {
-      type: "provider"
-      providerID: string
-    })
+    type: "provider"
+    providerID: string
+  })
   | (ProviderOptionBase & {
-      type: "custom"
-    })
+    type: "custom"
+  })
 
 export function providerOptions(list: { id: string; name: string }[]): ProviderOption[] {
   return [
@@ -375,7 +375,7 @@ function ApiMethod(props: ApiMethodProps) {
                 key.
               </text>
               <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://impactr.ai/zen</span> to get a key
+                Go to <span style={{ fg: theme.primary }}>https://impactr.dev/zen</span> to get a key
               </text>
             </box>
           ),
@@ -386,7 +386,7 @@ function ApiMethod(props: ApiMethodProps) {
                 with generous usage limits.
               </text>
               <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://impactr.ai/go</span> and enable Impactr Go
+                Go to <span style={{ fg: theme.primary }}>https://impactr.dev/go</span> and enable Impactr Go
               </text>
             </box>
           ),

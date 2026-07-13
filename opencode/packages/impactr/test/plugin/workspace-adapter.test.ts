@@ -74,7 +74,7 @@ describe("plugin.workspace", () => {
           path.join(dir, "impactr.json"),
           JSON.stringify(
             {
-              $schema: "https://impactr.ai/config.json",
+              $schema: "https://impactr.dev/config.json",
               plugin: [pathToFileURL(file).href],
             },
             null,

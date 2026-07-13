@@ -4,10 +4,10 @@
   "version": "1.17.13",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://impactr.ai",
+  "homepage": "https://impactr.dev",
   "author": {
     "name": "impactr",
-    "email": "hello@impactr.ai"
+    "email": "hello@impactr.dev"
   },
   "scripts": {
     "typecheck": "tsgo -b",

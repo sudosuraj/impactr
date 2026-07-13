@@ -705,7 +705,7 @@ export default function LegacyLayout(props: ParentProps) {
   async function prefetchMessages(directory: string, sessionID: string, token: number) {
     await serverSync()
       .session.prefetch(sessionID, prefetchChunk)
-      .catch(() => {})
+      .catch(() => { })
     if (prefetchToken.value !== token) return
     for (const stale of markPrefetched(directory, sessionID)) serverSync().session.evict(stale)
   }
@@ -2238,7 +2238,7 @@ export default function LegacyLayout(props: ParentProps) {
       settingsKeybind={() => command.keybind("settings.open")}
       onOpenSettings={openSettings}
       helpLabel={() => language.t("sidebar.help")}
-      onOpenHelp={() => platform.openLink("https://impactr.ai/desktop-feedback")}
+      onOpenHelp={() => platform.openLink("https://impactr.dev/desktop-feedback")}
       renderPanel={() =>
         mobile ? <SidebarPanel project={currentProject} mobile /> : <SidebarPanel project={currentProject} merged />
       }

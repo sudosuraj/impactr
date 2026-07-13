@@ -3,7 +3,7 @@
  */
 export const config = {
   // Base URL
-  baseUrl: "https://impactr.ai",
+  baseUrl: "https://impactr.dev",
 
   // GitHub
   github: {

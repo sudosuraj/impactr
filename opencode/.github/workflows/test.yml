@@ -51,7 +51,7 @@ jobs:
 
       - name: Configure git identity
         run: |
-          git config --global user.email "bot@impactr.ai"
+          git config --global user.email "bot@impactr.dev"
           git config --global user.name "impactr"
 
       - name: Cache Turbo

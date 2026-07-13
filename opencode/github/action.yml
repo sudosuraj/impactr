@@ -35,7 +35,7 @@ inputs:
     required: false
 
   oidc_base_url:
-    description: "Base URL for OIDC token exchange API. Only required when running a custom GitHub App install. Defaults to https://api.impactr.ai"
+    description: "Base URL for OIDC token exchange API. Only required when running a custom GitHub App install. Defaults to https://api.impactr.dev"
     required: false
 
 runs:
@@ -58,7 +58,7 @@ runs:
     - name: Install impactr
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      run: curl -fsSL https://impactr.ai/install | bash
+      run: curl -fsSL https://impactr.dev/install | bash
 
     - name: Add impactr to PATH
       shell: bash

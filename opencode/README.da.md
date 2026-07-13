@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://impactr.ai">
+  <a href="https://impactr.dev">
     <picture>
       <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
@@ -9,7 +9,7 @@
 </p>
 <p align="center">Den open source AI-kodeagent.</p>
 <p align="center">
-  <a href="https://impactr.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
+  <a href="https://impactr.dev/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
   <a href="https://www.npmjs.com/package/impactr-ai"><img alt="npm" src="https://img.shields.io/npm/v/impactr-ai?style=flat-square" /></a>
   <a href="https://github.com/anomalyco/impactr/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/impactr/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
@@ -39,7 +39,7 @@
   <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
-[![Impactr Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://impactr.ai)
+[![Impactr Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://impactr.dev)
 
 ---
 
@@ -47,7 +47,7 @@
 
 ```bash
 # YOLO
-curl -fsSL https://impactr.ai/install | bash
+curl -fsSL https://impactr.dev/install | bash
 
 # Pakkehåndteringer
 npm i -g impactr-ai@latest        # eller bun/pnpm/yarn
@@ -66,7 +66,7 @@ nix run nixpkgs#impactr           # eller github:anomalyco/impactr for nyeste de
 
 ### Desktop-app (BETA)
 
-Impactr findes også som desktop-app. Download direkte fra [releases-siden](https://github.com/anomalyco/impactr/releases) eller [impactr.ai/download](https://impactr.ai/download).
+Impactr findes også som desktop-app. Download direkte fra [releases-siden](https://github.com/anomalyco/impactr/releases) eller [impactr.dev/download](https://impactr.dev/download).
 
 | Platform              | Download                           |
 | --------------------- | ---------------------------------- |
@@ -93,8 +93,8 @@ Installationsscriptet bruger følgende prioriteringsrækkefølge for installatio
 
 ```bash
 # Eksempler
-IMPACTR_INSTALL_DIR=/usr/local/bin curl -fsSL https://impactr.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://impactr.ai/install | bash
+IMPACTR_INSTALL_DIR=/usr/local/bin curl -fsSL https://impactr.dev/install | bash
+XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://impactr.dev/install | bash
 ```
 
 ### Agents
@@ -110,11 +110,11 @@ Impactr har to indbyggede agents, som du kan skifte mellem med `Tab`-tasten.
 Derudover findes der en **general**-subagent til komplekse søgninger og flertrinsopgaver.
 Den bruges internt og kan kaldes via `@general` i beskeder.
 
-Læs mere om [agents](https://impactr.ai/docs/agents).
+Læs mere om [agents](https://impactr.dev/docs/agents).
 
 ### Dokumentation
 
-For mere info om konfiguration af Impactr, [**se vores docs**](https://impactr.ai/docs).
+For mere info om konfiguration af Impactr, [**se vores docs**](https://impactr.dev/docs).
 
 ### Bidrag
 

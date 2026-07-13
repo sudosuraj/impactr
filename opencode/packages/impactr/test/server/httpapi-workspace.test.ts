@@ -59,7 +59,7 @@ function localAdapter(directory: string): WorkspaceAdapter {
     async create() {
       await mkdir(directory, { recursive: true })
     },
-    async remove() {},
+    async remove() { },
     target() {
       return {
         type: "local" as const,
@@ -76,8 +76,8 @@ function listedAdapter(directory: string, type: string): WorkspaceAdapter {
     configure(info) {
       return { ...info, name: "unused", directory }
     },
-    async create() {},
-    async remove() {},
+    async create() { },
+    async remove() { },
     list(context) {
       return [
         {
@@ -117,7 +117,7 @@ function remoteAdapter(directory: string, url: string, headers?: HeadersInit): W
     async create() {
       await mkdir(directory, { recursive: true })
     },
-    async remove() {},
+    async remove() { },
     target() {
       return {
         type: "remote" as const,
@@ -399,7 +399,7 @@ describe("workspace HttpApi", () => {
             "content-type": "application/json",
             "x-impactr-workspace": "internal",
           },
-          body: JSON.stringify({ $schema: "https://impactr.ai/config.json" }),
+          body: JSON.stringify({ $schema: "https://impactr.dev/config.json" }),
         })
 
         const responseBody = yield* response.text
@@ -416,7 +416,7 @@ describe("workspace HttpApi", () => {
               "content-type": "application/json",
               "x-target-auth": "secret",
             }),
-            body: JSON.stringify({ $schema: "https://impactr.ai/config.json" }),
+            body: JSON.stringify({ $schema: "https://impactr.dev/config.json" }),
           },
         ])
         expect(forwarded[0]?.headers).not.toHaveProperty("x-impactr-directory")

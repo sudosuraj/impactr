@@ -52,7 +52,7 @@ const bootstrapFixture = Effect.gen(function* () {
     Bun.write(
       path.join(dir, "impactr.json"),
       JSON.stringify({
-        $schema: "https://impactr.ai/config.json",
+        $schema: "https://impactr.dev/config.json",
         plugin: [pathToFileURL(pluginFile).href],
       }),
     ),

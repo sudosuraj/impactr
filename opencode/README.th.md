@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://impactr.ai">
+  <a href="https://impactr.dev">
     <picture>
       <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
@@ -9,7 +9,7 @@
 </p>
 <p align="center">เอเจนต์การเขียนโค้ดด้วย AI แบบโอเพนซอร์ส</p>
 <p align="center">
-  <a href="https://impactr.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
+  <a href="https://impactr.dev/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
   <a href="https://www.npmjs.com/package/impactr-ai"><img alt="npm" src="https://img.shields.io/npm/v/impactr-ai?style=flat-square" /></a>
   <a href="https://github.com/anomalyco/impactr/actions/workflows/publish.yml"><img alt="สถานะการสร้าง" src="https://img.shields.io/github/actions/workflow/status/anomalyco/impactr/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
@@ -39,7 +39,7 @@
   <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
-[![Impactr Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://impactr.ai)
+[![Impactr Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://impactr.dev)
 
 ---
 
@@ -47,7 +47,7 @@
 
 ```bash
 # YOLO
-curl -fsSL https://impactr.ai/install | bash
+curl -fsSL https://impactr.dev/install | bash
 
 # ตัวจัดการแพ็กเกจ
 npm i -g impactr-ai@latest        # หรือ bun/pnpm/yarn
@@ -66,7 +66,7 @@ nix run nixpkgs#impactr           # หรือ github:anomalyco/impactr สำ
 
 ### แอปพลิเคชันเดสก์ท็อป (เบต้า)
 
-Impactr มีให้ใช้งานเป็นแอปพลิเคชันเดสก์ท็อป ดาวน์โหลดโดยตรงจาก [หน้ารุ่น](https://github.com/anomalyco/impactr/releases) หรือ [impactr.ai/download](https://impactr.ai/download)
+Impactr มีให้ใช้งานเป็นแอปพลิเคชันเดสก์ท็อป ดาวน์โหลดโดยตรงจาก [หน้ารุ่น](https://github.com/anomalyco/impactr/releases) หรือ [impactr.dev/download](https://impactr.dev/download)
 
 | แพลตฟอร์ม             | ดาวน์โหลด                          |
 | --------------------- | ---------------------------------- |
@@ -93,8 +93,8 @@ scoop bucket add extras; scoop install extras/impactr-desktop
 
 ```bash
 # ตัวอย่าง
-IMPACTR_INSTALL_DIR=/usr/local/bin curl -fsSL https://impactr.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://impactr.ai/install | bash
+IMPACTR_INSTALL_DIR=/usr/local/bin curl -fsSL https://impactr.dev/install | bash
+XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://impactr.dev/install | bash
 ```
 
 ### เอเจนต์
@@ -110,11 +110,11 @@ Impactr รวมเอเจนต์ในตัวสองตัวที่
 นอกจากนี้ยังมีเอเจนต์ย่อย **general** สำหรับการค้นหาที่ซับซ้อนและงานหลายขั้นตอน
 ใช้ภายในและสามารถเรียกใช้ได้โดยใช้ `@general` ในข้อความ
 
-เรียนรู้เพิ่มเติมเกี่ยวกับ [เอเจนต์](https://impactr.ai/docs/agents)
+เรียนรู้เพิ่มเติมเกี่ยวกับ [เอเจนต์](https://impactr.dev/docs/agents)
 
 ### เอกสารประกอบ
 
-สำหรับข้อมูลเพิ่มเติมเกี่ยวกับวิธีกำหนดค่า Impactr [**ไปที่เอกสารของเรา**](https://impactr.ai/docs)
+สำหรับข้อมูลเพิ่มเติมเกี่ยวกับวิธีกำหนดค่า Impactr [**ไปที่เอกสารของเรา**](https://impactr.dev/docs)
 
 ### การมีส่วนร่วม
 

@@ -18,7 +18,7 @@ Example:
 
 ```json
 {
-  "$schema": "https://impactr.ai/tui.json",
+  "$schema": "https://impactr.dev/tui.json",
   "theme": "smoke-theme",
   "leader_timeout": 2000,
   "keybinds": {

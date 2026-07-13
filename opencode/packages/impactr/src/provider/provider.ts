@@ -445,7 +445,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://impactr.ai/",
+            "HTTP-Referer": "https://impactr.dev/",
             "X-Title": "impactr",
             "X-Source": "impactr",
           },
@@ -456,7 +456,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://impactr.ai/",
+            "HTTP-Referer": "https://impactr.dev/",
             "X-Title": "impactr",
           },
         },
@@ -466,7 +466,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: provider.source === "config",
         options: {
           headers: {
-            "HTTP-Referer": "https://impactr.ai/",
+            "HTTP-Referer": "https://impactr.dev/",
             "X-Title": "impactr",
             "X-BILLING-INVOKE-ORIGIN": "Impactr",
           },
@@ -477,7 +477,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "http-referer": "https://impactr.ai/",
+            "http-referer": "https://impactr.dev/",
             "x-title": "impactr",
           },
         },
@@ -495,10 +495,10 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
 
       const location = String(
         provider.options?.location ??
-          env["GOOGLE_VERTEX_LOCATION"] ??
-          env["GOOGLE_CLOUD_LOCATION"] ??
-          env["VERTEX_LOCATION"] ??
-          "us-central1",
+        env["GOOGLE_VERTEX_LOCATION"] ??
+        env["GOOGLE_CLOUD_LOCATION"] ??
+        env["VERTEX_LOCATION"] ??
+        "us-central1",
       )
 
       const autoload = Boolean(project)
@@ -583,7 +583,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://impactr.ai/",
+            "HTTP-Referer": "https://impactr.dev/",
             "X-Title": "impactr",
           },
         },
@@ -783,7 +783,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       if (!apiToken) {
         throw new Error(
           "CLOUDFLARE_API_TOKEN (or CF_AIG_TOKEN) is required for Cloudflare AI Gateway. " +
-            "Set it via environment variable or run `impactr auth cloudflare-ai-gateway`.",
+          "Set it via environment variable or run `impactr auth cloudflare-ai-gateway`.",
         )
       }
 
@@ -841,7 +841,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://impactr.ai/",
+            "HTTP-Referer": "https://impactr.dev/",
             "X-Title": "impactr",
           },
         },
@@ -896,7 +896,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
                 delete body.max_tokens
                 init = { ...init, body: JSON.stringify(body) }
               }
-            } catch {}
+            } catch { }
           }
 
           const response = await fetch(url, init)
@@ -913,7 +913,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
                   { status: 200, headers: new Headers({ "content-type": "application/json" }) },
                 )
               }
-            } catch {}
+            } catch { }
           }
 
           if (response.body && response.headers.get("content-type")?.includes("text/event-stream")) {
@@ -1148,7 +1148,7 @@ interface State {
   varsLoaders: Record<string, CustomVarsLoader>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@impactr/Provider") {}
+export class Service extends Context.Service<Service, Interface>()("@impactr/Provider") { }
 
 export const use = serviceUse(Service)
 
@@ -1250,11 +1250,11 @@ export function fromModelsDevProvider(provider: ModelsDev.Provider): Info {
         cost: opts.cost ? mergeDeep(base.cost, cost(opts.cost)) : base.cost,
         options: opts.provider?.body
           ? Object.fromEntries(
-              Object.entries(opts.provider.body).map(([k, v]) => [
-                k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()),
-                v,
-              ]),
-            )
+            Object.entries(opts.provider.body).map(([k, v]) => [
+              k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()),
+              v,
+            ]),
+          )
           : base.options,
         headers: opts.provider?.headers ?? base.headers,
       }
@@ -1273,11 +1273,11 @@ export function fromModelsDevProvider(provider: ModelsDev.Provider): Info {
 function modelSuggestions(provider: Info | undefined, modelID: ModelV2.ID, enableExperimentalModels: boolean) {
   const available = provider
     ? Object.keys(provider.models).filter((id) => {
-        const model = provider.models[id]
-        if (model.status === "deprecated") return false
-        if (model.status === "alpha" && !enableExperimentalModels) return false
-        return true
-      })
+      const model = provider.models[id]
+      if (model.status === "deprecated") return false
+      if (model.status === "alpha" && !enableExperimentalModels) return false
+      return true
+    })
     : []
   const fuzzy = fuzzysort.go(modelID, available, { limit: 3, threshold: -10000 }).map((m) => m.target)
   if (fuzzy.length) return fuzzy
@@ -1570,7 +1570,7 @@ const layer = Layer.effect(
                   providers[gitlab].models[modelID] = model
                 }
               }
-            } catch (e) {}
+            } catch (e) { }
           })
         }
 
@@ -1782,8 +1782,8 @@ const layer = Layer.effect(
         const suggestions = catalogProvider
           ? modelSuggestions(catalogProvider, modelID, runtimeFlags.enableExperimentalModels)
           : fuzzysort
-              .go(providerID, Object.keys({ ...s.catalog, ...s.providers }), { limit: 3, threshold: -10000 })
-              .map((m) => m.target)
+            .go(providerID, Object.keys({ ...s.catalog, ...s.providers }), { limit: 3, threshold: -10000 })
+            .map((m) => m.target)
         return yield* new ModelNotFoundError({ providerID, modelID, suggestions })
       }
 
@@ -1810,14 +1810,14 @@ const layer = Layer.effect(
           const sdk = await resolveSDK(model, s, envs)
           const language = s.modelLoaders[model.providerID]
             ? await s.modelLoaders[model.providerID](
-                sdk,
-                model.api.id,
-                {
-                  ...provider.options,
-                  ...model.options,
-                },
-                model,
-              )
+              sdk,
+              model.api.id,
+              {
+                ...provider.options,
+                ...model.options,
+              },
+              model,
+            )
             : sdk.languageModel(model.api.id)
           s.models.set(key, language)
           return language

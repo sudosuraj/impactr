@@ -67,7 +67,7 @@ export default function Home() {
               <span>
                 <span>curl -fsSL </span>
                 <span data-slot="protocol">https://</span>
-                <span data-slot="highlight">impactr.ai/install</span>
+                <span data-slot="highlight">impactr.dev/install</span>
                 <span> | bash</span>
               </span>
               <CopyStatus />
@@ -164,7 +164,7 @@ export default function Home() {
             <a href="https://github.com/anomalyco/impactr">{i18n.t("footer.github")}</a>
           </div>
           <div data-slot="cell">
-            <a href="https://impactr.ai/discord">{i18n.t("footer.discord")}</a>
+            <a href="https://impactr.dev/discord">{i18n.t("footer.discord")}</a>
           </div>
         </footer>
       </div>

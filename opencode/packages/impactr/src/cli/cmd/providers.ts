@@ -242,7 +242,7 @@ export const ProvidersCommand = cmd({
   describe: "manage AI providers and credentials",
   builder: (yargs) =>
     yargs.command(ProvidersListCommand).command(ProvidersLoginCommand).command(ProvidersLogoutCommand).demandCommand(),
-  async handler() {},
+  async handler() { },
 })
 
 export const ProvidersListCommand = effectCmd({
@@ -456,15 +456,15 @@ export const ProvidersLoginCommand = effectCmd({
     if (provider === "amazon-bedrock") {
       yield* Prompt.log.info(
         "Amazon Bedrock authentication priority:\n" +
-          "  1. Bearer token (AWS_BEARER_TOKEN_BEDROCK or /connect)\n" +
-          "  2. AWS credential chain (profile, access keys, IAM roles, EKS IRSA)\n\n" +
-          "Configure via impactr.json options (profile, region, endpoint) or\n" +
-          "AWS environment variables (AWS_PROFILE, AWS_REGION, AWS_ACCESS_KEY_ID, AWS_WEB_IDENTITY_TOKEN_FILE).",
+        "  1. Bearer token (AWS_BEARER_TOKEN_BEDROCK or /connect)\n" +
+        "  2. AWS credential chain (profile, access keys, IAM roles, EKS IRSA)\n\n" +
+        "Configure via impactr.json options (profile, region, endpoint) or\n" +
+        "AWS environment variables (AWS_PROFILE, AWS_REGION, AWS_ACCESS_KEY_ID, AWS_WEB_IDENTITY_TOKEN_FILE).",
       )
     }
 
     if (provider === "impactr") {
-      yield* Prompt.log.info("Create an api key at https://impactr.ai/auth")
+      yield* Prompt.log.info("Create an api key at https://impactr.dev/auth")
     }
 
     if (provider === "vercel") {
@@ -473,7 +473,7 @@ export const ProvidersLoginCommand = effectCmd({
 
     if (["cloudflare", "cloudflare-ai-gateway"].includes(provider)) {
       yield* Prompt.log.info(
-        "Cloudflare AI Gateway can be configured with CLOUDFLARE_GATEWAY_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN environment variables. Read more: https://impactr.ai/docs/providers/#cloudflare-ai-gateway",
+        "Cloudflare AI Gateway can be configured with CLOUDFLARE_GATEWAY_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN environment variables. Read more: https://impactr.dev/docs/providers/#cloudflare-ai-gateway",
       )
     }
 
@@ -516,17 +516,17 @@ export const ProvidersLogoutCommand = effectCmd({
     }))
     const provider = args.provider
       ? options.find(
-          (option) =>
-            option.value === args.provider ||
-            database[option.value]?.name?.toLowerCase() === args.provider?.toLowerCase(),
-        )?.value
+        (option) =>
+          option.value === args.provider ||
+          database[option.value]?.name?.toLowerCase() === args.provider?.toLowerCase(),
+      )?.value
       : yield* promptValue(
-          yield* Prompt.autocomplete({
-            message: "Select provider",
-            maxItems: 8,
-            options,
-          }),
-        )
+        yield* Prompt.autocomplete({
+          message: "Select provider",
+          maxItems: 8,
+          options,
+        }),
+      )
     if (!provider) return yield* fail(`Unknown configured provider "${args.provider}"`)
     yield* Effect.orDie(authSvc.remove(provider))
     yield* Prompt.outro("Logout successful")

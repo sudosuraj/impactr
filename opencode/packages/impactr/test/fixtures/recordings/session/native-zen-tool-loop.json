@@ -6,14 +6,19 @@
     "provider": "impactr",
     "protocol": "openai-responses",
     "route": "openai-responses",
-    "tags": ["impactr", "zen", "native", "tool-loop"]
+    "tags": [
+      "impactr",
+      "zen",
+      "native",
+      "tool-loop"
+    ]
   },
   "interactions": [
     {
       "transport": "http",
       "request": {
         "method": "POST",
-        "url": "https://console.impactr.ai/proxy/connections/{connection}/v1/responses",
+        "url": "https://console.impactr.dev/proxy/connections/{connection}/v1/responses",
         "headers": {
           "content-type": "application/json"
         },
@@ -31,7 +36,7 @@
       "transport": "http",
       "request": {
         "method": "POST",
-        "url": "https://console.impactr.ai/proxy/connections/{connection}/v1/responses",
+        "url": "https://console.impactr.dev/proxy/connections/{connection}/v1/responses",
         "headers": {
           "content-type": "application/json"
         },

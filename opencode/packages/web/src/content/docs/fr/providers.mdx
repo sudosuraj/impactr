@@ -35,7 +35,7 @@ Vous pouvez personnaliser la base URL pour n'importe quel fournisseur en défini
 
 ```json title="impactr.json" {6}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "anthropic": {
       "options": {
@@ -57,7 +57,7 @@ testé et vérifié pour fonctionner correctement avec Impactr. [En savoir plus]
 Si vous êtes nouveau, nous vous recommandons de commencer par Impactr Zen.
 :::
 
-1. Exécutez la commande `/connect` dans le TUI, sélectionnez impactr et dirigez-vous vers [impactr.ai/auth](https://impactr.ai/auth).
+1. Exécutez la commande `/connect` dans le TUI, sélectionnez impactr et dirigez-vous vers [impactr.dev/auth](https://impactr.dev/auth).
 
    ```txt
    /connect
@@ -89,7 +89,7 @@ Il fonctionne comme n’importe quel autre fournisseur dans Impactr et son utili
 Impactr Go est un plan d'abonnement à faible coût qui offre un accès fiable aux modèles de codage ouverts populaires fournis par l'équipe Impactr qui ont été
 testé et vérifié pour fonctionner correctement avec Impactr.
 
-1. Exécutez la commande `/connect` dans le TUI, sélectionnez `Impactr Go` et rendez-vous sur [impactr.ai/auth](https://impactr.ai/zen).
+1. Exécutez la commande `/connect` dans le TUI, sélectionnez `Impactr Go` et rendez-vous sur [impactr.dev/auth](https://impactr.dev/zen).
 
    ```txt
    /connect
@@ -195,7 +195,7 @@ Pour une configuration spécifique au projet ou persistante, utilisez `impactr.j
 
 ```json title="impactr.json"
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "amazon-bedrock": {
       "options": {
@@ -223,7 +223,7 @@ Si vous utilisez des points de terminaison d'un VPC pour Bedrock :
 
 ```json title="impactr.json"
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "amazon-bedrock": {
       "options": {
@@ -269,7 +269,7 @@ Pour les profils d'inférence personnalisés, utilisez le nom du modèle et du f
 
 ```json title="impactr.json"
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "amazon-bedrock": {
       // ...
@@ -331,7 +331,7 @@ Vous pouvez configurer impactr pour utiliser des modèles locaux via [Atomic Cha
 
 ```json title="impactr.json" "atomic-chat" {5, 6, 8, 10-14}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "atomic-chat": {
       "npm": "@ai-sdk/openai-compatible",
@@ -559,7 +559,7 @@ Vous pouvez également ajouter des modèles via votre configuration impactr.
 
 ```json title="impactr.json"
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "cloudflare-ai-gateway": {
       "models": {
@@ -769,7 +769,7 @@ Fichier `impactr.json`. Il est également recommandé de désactiver le partage 
 
 ```json
 {
-"$schema": "https://impactr.ai/config.json",
+"$schema": "https://impactr.dev/config.json",
 "small_model": "gitlab/duo-chat-haiku-4-5",
 "share": "disabled"
 }
@@ -831,7 +831,7 @@ Personnalisez via `impactr.json` :
 
 ```json title="impactr.json"
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "gitlab": {
       "options": {
@@ -848,7 +848,7 @@ Pour accéder aux outils GitLab (demandes de fusion, tickets, pipelines, CI/CD, 
 
 ```json title="impactr.json"
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "plugin": ["impactr-gitlab-plugin"]
 }
 ```
@@ -1031,7 +1031,7 @@ Voici le [Répertoire des modèles d'Helicone](https://helicone.ai/models), vous
 
 ```jsonc title="~/.config/impactr/impactr.jsonc"
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "helicone": {
       "npm": "@ai-sdk/openai-compatible",
@@ -1059,7 +1059,7 @@ Helicone prend en charge les en-têtes personnalisés pour des fonctionnalités 
 
 ```jsonc title="~/.config/impactr/impactr.jsonc"
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "helicone": {
       "npm": "@ai-sdk/openai-compatible",
@@ -1113,7 +1113,7 @@ Vous pouvez configurer impactr pour utiliser des modèles locaux via l'utilitair
 
 ```json title="impactr.json" "llama.cpp" {5, 6, 8, 10-15}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "llama.cpp": {
       "npm": "@ai-sdk/openai-compatible",
@@ -1180,7 +1180,7 @@ Vous pouvez configurer impactr pour utiliser des modèles locaux via LM Studio.
 
 ```json title="impactr.json" "lmstudio" {5, 6, 8, 10-14}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "lmstudio": {
       "npm": "@ai-sdk/openai-compatible",
@@ -1301,7 +1301,7 @@ Ollama peut se configurer automatiquement pour Impactr. Voir les [documents d'in
 
 ```json title="impactr.json" "ollama" {5, 6, 8, 10-14}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
@@ -1463,7 +1463,7 @@ Vous pouvez également ajouter des modèles supplémentaires via votre configura
 
 ```json title="impactr.json" {6}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "openrouter": {
       "models": {
@@ -1478,7 +1478,7 @@ Vous pouvez également ajouter des modèles supplémentaires via votre configura
 
    ```json title="impactr.json"
    {
-     "$schema": "https://impactr.ai/config.json",
+     "$schema": "https://impactr.dev/config.json",
      "provider": {
        "openrouter": {
          "models": {
@@ -1727,7 +1727,7 @@ Vous pouvez également personnaliser les modèles via votre configuration impact
 
 ```json title="impactr.json"
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "vercel": {
       "models": {
@@ -1837,7 +1837,7 @@ Vous pouvez également ajouter des modèles supplémentaires via votre configura
 
 ```json title="impactr.json" {6}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "zenmux": {
       "models": {
@@ -1905,7 +1905,7 @@ Vous pouvez utiliser n'importe quel fournisseur compatible OpenAI avec impactr. 
 
    ```json title="impactr.json" ""myprovider"" {5-15}
    {
-     "$schema": "https://impactr.ai/config.json",
+     "$schema": "https://impactr.dev/config.json",
      "provider": {
        "myprovider": {
          "npm": "@ai-sdk/openai-compatible",
@@ -1944,7 +1944,7 @@ Voici un exemple de définition des options `apiKey`, `headers` et modèle `limi
 
 ```json title="impactr.json" {9,11,17-20}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "myprovider": {
       "npm": "@ai-sdk/openai-compatible",

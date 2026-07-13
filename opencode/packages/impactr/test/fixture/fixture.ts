@@ -96,7 +96,7 @@ export async function tmpdir<T>(options?: TmpDirOptions<T>) {
     await Bun.write(
       path.join(dirpath, "impactr.json"),
       JSON.stringify({
-        $schema: "https://impactr.ai/config.json",
+        $schema: "https://impactr.dev/config.json",
         ...options.config,
       }),
     )
@@ -154,7 +154,7 @@ export function tmpdirScoped<E = never, R = never>(options?: {
       yield* Effect.promise(() =>
         fs.writeFile(
           path.join(dir, "impactr.json"),
-          JSON.stringify({ $schema: "https://impactr.ai/config.json", ...resolved }),
+          JSON.stringify({ $schema: "https://impactr.dev/config.json", ...resolved }),
         ),
       )
     }
@@ -167,13 +167,13 @@ export function tmpdirScoped<E = never, R = never>(options?: {
 
 export const provideInstance =
   (directory: string) =>
-  <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R | InstanceStore.Service> =>
-    InstanceStore.Service.use((store) => store.provide({ directory }, self))
+    <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R | InstanceStore.Service> =>
+      InstanceStore.Service.use((store) => store.provide({ directory }, self))
 
 export const provideInstanceEffect =
   (directory: string) =>
-  <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R | InstanceStore.Service> =>
-    InstanceStore.Service.use((store) => store.provide({ directory }, self))
+    <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R | InstanceStore.Service> =>
+      InstanceStore.Service.use((store) => store.provide({ directory }, self))
 
 export const reloadInstance = (input: InstanceStore.LoadInput) =>
   InstanceStore.Service.use((store) => store.reload(input))
@@ -190,7 +190,7 @@ export function provideTmpdirInstance<A, E, R>(
   }).pipe(Effect.provide(testInstanceStoreLayer))
 }
 
-export class TestInstance extends Context.Service<TestInstance, { readonly directory: string }>()("@test/Instance") {}
+export class TestInstance extends Context.Service<TestInstance, { readonly directory: string }>()("@test/Instance") { }
 
 export const requireInstance = Effect.gen(function* () {
   const instance = yield* InstanceRef
@@ -204,11 +204,11 @@ export const withTmpdirInstance =
     config?: Partial<ConfigV1.Info> | (() => Partial<ConfigV1.Info>)
     init?: (directory: string) => Effect.Effect<void, E2, R2>
   }) =>
-  <A, E, R>(self: Effect.Effect<A, E, R>) =>
-    Effect.gen(function* () {
-      const directory = yield* tmpdirScoped(options)
-      return yield* self.pipe(Effect.provideService(TestInstance, { directory }), provideInstanceEffect(directory))
-    }).pipe(Effect.provide(testInstanceStoreLayer), Effect.provide(AppNodeBuilder.build(CrossSpawnSpawner.node)))
+    <A, E, R>(self: Effect.Effect<A, E, R>) =>
+      Effect.gen(function* () {
+        const directory = yield* tmpdirScoped(options)
+        return yield* self.pipe(Effect.provideService(TestInstance, { directory }), provideInstanceEffect(directory))
+      }).pipe(Effect.provide(testInstanceStoreLayer), Effect.provide(AppNodeBuilder.build(CrossSpawnSpawner.node)))
 
 export function provideTmpdirServer<A, E, R>(
   self: (input: { dir: string; llm: TestLLMServer["Service"] }) => Effect.Effect<A, E, R>,

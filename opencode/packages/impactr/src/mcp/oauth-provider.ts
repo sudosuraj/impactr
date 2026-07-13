@@ -30,7 +30,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
     protected config: McpOAuthConfig,
     private callbacks: McpOAuthCallbacks,
     protected auth: McpAuth.Interface,
-  ) {}
+  ) { }
 
   get redirectUrl(): string {
     if (this.config.redirectUri) {
@@ -44,7 +44,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
     return {
       redirect_uris: [this.redirectUrl],
       client_name: "Impactr",
-      client_uri: "https://impactr.ai",
+      client_uri: "https://impactr.dev",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
       token_endpoint_auth_method: this.config.clientSecret ? "client_secret_post" : "none",
@@ -224,11 +224,11 @@ export class McpOAuthPendingProvider extends McpOAuthProvider {
           clientInfo:
             this.pendingClientInfo && !this.config.clientId
               ? {
-                  clientId: this.pendingClientInfo.client_id,
-                  clientSecret: this.pendingClientInfo.client_secret,
-                  clientIdIssuedAt: this.pendingClientInfo.client_id_issued_at,
-                  clientSecretExpiresAt: this.pendingClientInfo.client_secret_expires_at,
-                }
+                clientId: this.pendingClientInfo.client_id,
+                clientSecret: this.pendingClientInfo.client_secret,
+                clientIdIssuedAt: this.pendingClientInfo.client_id_issued_at,
+                clientSecretExpiresAt: this.pendingClientInfo.client_secret_expires_at,
+              }
               : undefined,
         },
         this.serverUrl,

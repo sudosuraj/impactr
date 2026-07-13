@@ -132,7 +132,7 @@ export function Header(props: { githubStars: string; links?: readonly HeaderLink
             <strong>{i18n.t("header.github")}</strong>
             <span>[{props.githubStars}]</span>
           </a>
-          <a data-slot="header-button" data-variant="contrast" href="https://impactr.ai/">
+          <a data-slot="header-button" data-variant="contrast" href="https://impactr.dev/">
             <strong>{i18n.t("header.tryImpactr")}</strong>
           </a>
           <button
@@ -231,12 +231,12 @@ export function Footer(props: {
     { href: "#geo-breakdown", label: i18n.t("nav.geoBreakdown") },
   ]
   const legal = [
-    { href: "https://impactr.ai/legal/terms-of-service", label: i18n.t("footer.terms") },
-    { href: "https://impactr.ai/legal/privacy-policy", label: i18n.t("footer.privacy") },
+    { href: "https://impactr.dev/legal/terms-of-service", label: i18n.t("footer.terms") },
+    { href: "https://impactr.dev/legal/privacy-policy", label: i18n.t("footer.privacy") },
   ]
   const connect = [
-    { href: "mailto:hello@impactr.ai", label: i18n.t("footer.contact") },
-    { href: "https://impactr.ai/discord", label: i18n.t("footer.community") },
+    { href: "mailto:hello@impactr.dev", label: i18n.t("footer.contact") },
+    { href: "https://impactr.dev/discord", label: i18n.t("footer.community") },
     { href: "https://x.com/impactr", label: "X" },
     { href: githubLink.href, label: i18n.t("header.github") },
     { href: "https://www.youtube.com/@anomaly-co", label: i18n.t("footer.youtube") },
@@ -246,7 +246,7 @@ export function Footer(props: {
     <footer data-component="footer">
       <SectionBridge label={i18n.t("nav.geoBreakdown").toUpperCase()} href="#geo-breakdown" />
       <div data-slot="footer-grid">
-        <a data-slot="footer-mark" href="https://impactr.ai" aria-label={i18n.t("footer.homeAria")}>
+        <a data-slot="footer-mark" href="https://impactr.dev" aria-label={i18n.t("footer.homeAria")}>
           <ImpactrMark />
         </a>
         <FooterColumn title={i18n.t("footer.modelData")} links={modelStats} localHref={localHref} />

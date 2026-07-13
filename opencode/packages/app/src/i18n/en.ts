@@ -140,7 +140,7 @@ export const dict = {
   "provider.connect.impactrZen.line2":
     "With a single API key you'll get access to models such as Claude, GPT, Gemini, GLM and more.",
   "provider.connect.impactrZen.visit.prefix": "Visit ",
-  "provider.connect.impactrZen.visit.link": "impactr.ai/zen",
+  "provider.connect.impactrZen.visit.link": "impactr.dev/zen",
   "provider.connect.impactrZen.visit.suffix": " to collect your API key.",
   "provider.connect.oauth.code.visit.prefix": "Visit ",
   "provider.connect.oauth.code.visit.link": "this link",

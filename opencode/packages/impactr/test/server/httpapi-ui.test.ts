@@ -201,7 +201,7 @@ describe("HttpApi UI fallback", () => {
       expect(response.status).toBe(200)
       expect(response.headers.get("content-type")).toContain("text/html")
       expect(yield* responseText(response)).toBe("<html>impactr</html>")
-      expect(proxiedUrl).toBe("https://app.impactr.ai/")
+      expect(proxiedUrl).toBe("https://app.impactr.dev/")
     }),
   )
 
@@ -246,7 +246,7 @@ describe("HttpApi UI fallback", () => {
       )
 
       expect(response.status).toBe(200)
-      expect(proxiedUrl).toBe("https://app.impactr.ai/assets/app.js")
+      expect(proxiedUrl).toBe("https://app.impactr.dev/assets/app.js")
       expect(response.headers.get("content-encoding")).toBeNull()
       expect(response.headers.get("content-length")).not.toBe("999")
       expect(response.headers.get("content-type")).toContain("text/javascript")
@@ -338,10 +338,10 @@ describe("HttpApi UI fallback", () => {
           readFile: (path) => {
             return path === "/$bunfs/root/index.html"
               ? Effect.succeed(
-                  new TextEncoder().encode(
-                    `<html><head><script id="oc-theme-preload-script">${script}</script></head></html>`,
-                  ),
-                )
+                new TextEncoder().encode(
+                  `<html><head><script id="oc-theme-preload-script">${script}</script></head></html>`,
+                ),
+              )
               : Effect.die(`unexpected embedded UI path: ${path}`)
           },
         },

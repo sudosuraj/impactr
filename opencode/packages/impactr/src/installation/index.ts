@@ -79,7 +79,7 @@ export interface Interface {
   readonly upgrade: (method: Method, target: string) => Effect.Effect<void, UpgradeFailedError>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@impactr/Installation") {}
+export class Service extends Context.Service<Service, Interface>()("@impactr/Installation") { }
 
 export const use = serviceUse(Service)
 
@@ -144,7 +144,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
 
     const upgradeCurl = Effect.fnUntraced(
       function* (target: string) {
-        const response = yield* httpOk.execute(HttpClientRequest.get("https://impactr.ai/install"))
+        const response = yield* httpOk.execute(HttpClientRequest.get("https://impactr.dev/install"))
         const body = yield* response.text
         const bodyBytes = new TextEncoder().encode(body)
         const shell = yield* upgradeScriptShell()

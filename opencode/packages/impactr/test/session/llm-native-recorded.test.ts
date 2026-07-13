@@ -28,7 +28,7 @@ import { LayerNodePlatform } from "@impactr-ai/core/effect/app-node-platform"
 
 const FIXTURES_DIR = path.join(import.meta.dir, "../fixtures/recordings")
 
-const zenURL = (connection: string) => `https://console.impactr.ai/proxy/connections/${connection}/v1`
+const zenURL = (connection: string) => `https://console.impactr.dev/proxy/connections/${connection}/v1`
 
 const replayOpenAIOAuth = {
   type: "oauth",
@@ -274,11 +274,11 @@ function recordedNativeLLMLayer(scenario: RecordedScenario) {
   }
   const recordedHttp = shouldRecord
     ? HttpRecorderInternal.cassetteLayer(scenario.cassette, {
-        directory: FIXTURES_DIR,
-        mode: "record",
-        metadata,
-        redactor: HttpRecorderInternal.Redactor.make(redact),
-      })
+      directory: FIXTURES_DIR,
+      mode: "record",
+      metadata,
+      redactor: HttpRecorderInternal.Redactor.make(redact),
+    })
     : HttpRecorder.http(scenario.cassette, { directory: FIXTURES_DIR, metadata, redact })
   return AppNodeBuilder.build(LayerNode.group([Provider.node, LLM.node]), [
     [LayerNodePlatform.requestExecutor, RequestExecutor.layer.pipe(Layer.provide(recordedHttp))],
@@ -291,7 +291,7 @@ const writeConfig = (directory: string, scenario: RecordedScenario, model: Model
   Effect.promise(() =>
     Bun.write(
       path.join(directory, "impactr.json"),
-      JSON.stringify({ $schema: "https://impactr.ai/config.json", ...scenario.config(model) }),
+      JSON.stringify({ $schema: "https://impactr.dev/config.json", ...scenario.config(model) }),
     ),
   )
 
@@ -317,28 +317,28 @@ const toolRoundtrip = (
   call: { readonly id: string; readonly name: string; readonly input: unknown },
   result: JSONValue,
 ): ModelMessage[] => [
-  {
-    role: "assistant",
-    content: [
-      ...events.filter(LLMEvent.is.reasoningEnd).map((part) => ({
-        type: "reasoning" as const,
-        text: events
-          .filter(LLMEvent.is.reasoningDelta)
-          .filter((event) => event.id === part.id)
-          .map((event) => event.text)
-          .join(""),
-        providerMetadata: part.providerMetadata,
-      })),
-      { type: "tool-call", toolCallId: call.id, toolName: call.name, input: call.input },
-    ],
-  },
-  {
-    role: "tool",
-    content: [
-      { type: "tool-result", toolCallId: call.id, toolName: call.name, output: { type: "json", value: result } },
-    ],
-  },
-]
+    {
+      role: "assistant",
+      content: [
+        ...events.filter(LLMEvent.is.reasoningEnd).map((part) => ({
+          type: "reasoning" as const,
+          text: events
+            .filter(LLMEvent.is.reasoningDelta)
+            .filter((event) => event.id === part.id)
+            .map((event) => event.text)
+            .join(""),
+          providerMetadata: part.providerMetadata,
+        })),
+        { type: "tool-call", toolCallId: call.id, toolName: call.name, input: call.input },
+      ],
+    },
+    {
+      role: "tool",
+      content: [
+        { type: "tool-result", toolCallId: call.id, toolName: call.name, output: { type: "json", value: result } },
+      ],
+    },
+  ]
 
 const driveToolLoop = (scenario: RecordedScenario) =>
   Effect.gen(function* () {
@@ -404,7 +404,7 @@ describe("session.llm native recorded", () => {
         })
         continue
       }
-      test.skip(`${scenario.name}: drives a tool loop to a final text answer`, () => {})
+      test.skip(`${scenario.name}: drives a tool loop to a final text answer`, () => { })
       continue
     }
     const it = testEffect(recordedNativeLLMLayer(scenario))

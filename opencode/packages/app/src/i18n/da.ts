@@ -137,7 +137,7 @@ export const dict = {
   "provider.connect.impactrZen.line2":
     "Med en enkelt API-nøgle får du adgang til modeller som Claude, GPT, Gemini, GLM og flere.",
   "provider.connect.impactrZen.visit.prefix": "Besøg ",
-  "provider.connect.impactrZen.visit.link": "impactr.ai/zen",
+  "provider.connect.impactrZen.visit.link": "impactr.dev/zen",
   "provider.connect.impactrZen.visit.suffix": " for at hente din API-nøgle.",
   "provider.connect.oauth.code.visit.prefix": "Besøg ",
   "provider.connect.oauth.code.visit.link": "dette link",

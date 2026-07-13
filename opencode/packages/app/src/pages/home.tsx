@@ -355,7 +355,7 @@ export function NewHome() {
                   ),
                 )
               })
-              .catch(() => {})
+              .catch(() => { })
               .finally(dispose)
           } catch {
             dispose()
@@ -536,7 +536,7 @@ export function NewHome() {
           clearNotifications={clearNotifications}
           unseenCount={unseenCount}
           openSettings={openSettings}
-          openHelp={() => platform.openLink("https://impactr.ai/desktop-feedback")}
+          openHelp={() => platform.openLink("https://impactr.dev/desktop-feedback")}
           language={language}
         />
 
@@ -630,7 +630,7 @@ export function NewHome() {
         <HomeUtilityNav
           class="flex lg:hidden"
           openSettings={openSettings}
-          openHelp={() => platform.openLink("https://impactr.ai/desktop-feedback")}
+          openHelp={() => platform.openLink("https://impactr.dev/desktop-feedback")}
           language={language}
         />
       </div>

@@ -1,6 +1,6 @@
 # impactr GitHub Action
 
-A GitHub Action that integrates [impactr](https://impactr.ai) directly into your GitHub workflow.
+A GitHub Action that integrates [impactr](https://impactr.dev) directly into your GitHub workflow.
 
 Mention `/impactr` in your comment, and impactr will execute tasks within your GitHub Actions runner.
 

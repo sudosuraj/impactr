@@ -38,9 +38,9 @@ describe("inlineCodeKind", () => {
   })
 
   test("detects urls", () => {
-    expect(inlineCodeKind(`https://impactr.ai/docs`)).toBe("url")
+    expect(inlineCodeKind(`https://impactr.dev/docs`)).toBe("url")
     expect(inlineCodeKind(`http://localhost:4444`)).toBe("url")
     expect(inlineCodeKind(`file:///tmp/impactr`)).toBeUndefined()
-    expect(inlineCodeKind(`ftp://impactr.ai/docs`)).toBeUndefined()
+    expect(inlineCodeKind(`ftp://impactr.dev/docs`)).toBeUndefined()
   })
 })

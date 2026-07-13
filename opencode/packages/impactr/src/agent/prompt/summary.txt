@@ -1,4 +1,4 @@
-Summarize what was done in this conversation. Write like a pull request description.
+Summarize what was done in this conversation. Write like an engagement log or vulnerability report summary.
 
 Rules:
 - 2-3 sentences max

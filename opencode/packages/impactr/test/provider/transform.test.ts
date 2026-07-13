@@ -2485,7 +2485,7 @@ describe("ProviderTransform.message - strip openai metadata when store=false", (
       providerID: "impactr",
       api: {
         id: "impactr-test",
-        url: "https://api.impactr.ai",
+        url: "https://api.impactr.dev",
         npm: "@ai-sdk/openai-compatible",
       },
     }
@@ -2519,7 +2519,7 @@ describe("ProviderTransform.message - strip openai metadata when store=false", (
       providerID: "impactr",
       api: {
         id: "impactr-test",
-        url: "https://api.impactr.ai",
+        url: "https://api.impactr.dev",
         npm: "@ai-sdk/openai-compatible",
       },
     }

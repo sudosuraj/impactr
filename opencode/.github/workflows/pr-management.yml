@@ -37,7 +37,7 @@ jobs:
 
       - name: Install impactr
         if: steps.team-check.outputs.is_team != 'true'
-        run: curl -fsSL https://impactr.ai/install | bash
+        run: curl -fsSL https://impactr.dev/install | bash
 
       - name: Build prompt
         if: steps.team-check.outputs.is_team != 'true'

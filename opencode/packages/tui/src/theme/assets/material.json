@@ -1,5 +1,5 @@
 {
-  "$schema": "https://impactr.ai/theme.json",
+  "$schema": "https://impactr.dev/theme.json",
   "defs": {
     "darkBg": "#263238",
     "darkBgAlt": "#1e272c",

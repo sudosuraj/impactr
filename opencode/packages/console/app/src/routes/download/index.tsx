@@ -118,10 +118,10 @@ export default function Download() {
             <div data-component="section-content">
               <button
                 data-component="cli-row"
-                onClick={handleCopyClick("curl -fsSL https://impactr.ai/install | bash")}
+                onClick={handleCopyClick("curl -fsSL https://impactr.dev/install | bash")}
               >
                 <code>
-                  curl -fsSL https://<strong>impactr.ai/install</strong> | bash
+                  curl -fsSL https://<strong>impactr.dev/install</strong> | bash
                 </code>
                 <CopyStatus />
               </button>

@@ -32,7 +32,7 @@ describe("VercelPlugin", () => {
       yield* addPlugin()
       expect((yield* catalog.provider.get(ProviderV2.ID.make("vercel")))?.request.headers).toEqual({
         Existing: "1",
-        "http-referer": "https://impactr.ai/",
+        "http-referer": "https://impactr.dev/",
         "x-title": "impactr",
       })
     }),
@@ -75,7 +75,7 @@ describe("VercelPlugin", () => {
   it.effect("ignores non-Vercel providers", () =>
     Effect.gen(function* () {
       const catalog = yield* Catalog.Service
-      yield* catalog.transform((catalog) => catalog.provider.update(ProviderV2.ID.make("gateway"), () => {}))
+      yield* catalog.transform((catalog) => catalog.provider.update(ProviderV2.ID.make("gateway"), () => { }))
       yield* addPlugin()
       expect((yield* catalog.provider.get(ProviderV2.ID.make("gateway")))?.request.headers).toEqual({})
     }),

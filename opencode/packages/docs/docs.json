@@ -15,8 +15,12 @@
         "groups": [
           {
             "group": "Getting started",
-            "pages": ["index", "quickstart", "development"],
-            "openapi": "https://impactr.ai/openapi.json"
+            "pages": [
+              "index",
+              "quickstart",
+              "development"
+            ],
+            "openapi": "https://impactr.dev/openapi.json"
           }
         ]
       }
@@ -41,7 +45,16 @@
     }
   },
   "contextual": {
-    "options": ["copy", "view", "chatgpt", "claude", "perplexity", "mcp", "cursor", "vscode"]
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
   },
   "footer": {
     "socials": {

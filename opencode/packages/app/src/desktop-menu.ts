@@ -200,7 +200,7 @@ export const DESKTOP_MENU: DesktopMenu[] = [
     id: "help",
     label: "Help",
     items: [
-      { type: "item", label: "impactr Documentation", href: "https://impactr.ai/docs" },
+      { type: "item", label: "impactr Documentation", href: "https://impactr.dev/docs" },
       { type: "item", label: "Support Forum", href: "https://discord.com/invite/impactr" },
       { type: "item", label: "Export Logs...", command: "logs.export" },
       { type: "separator" },

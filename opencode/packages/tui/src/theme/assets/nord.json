@@ -1,5 +1,5 @@
 {
-  "$schema": "https://impactr.ai/theme.json",
+  "$schema": "https://impactr.dev/theme.json",
   "defs": {
     "nord0": "#2E3440",
     "nord1": "#3B4252",

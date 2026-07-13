@@ -125,7 +125,7 @@ export const dict = {
   "provider.connect.impactrZen.line2":
     "Z jednym kluczem API uzyskasz dostęp do modeli takich jak Claude, GPT, Gemini, GLM i więcej.",
   "provider.connect.impactrZen.visit.prefix": "Odwiedź ",
-  "provider.connect.impactrZen.visit.link": "impactr.ai/zen",
+  "provider.connect.impactrZen.visit.link": "impactr.dev/zen",
   "provider.connect.impactrZen.visit.suffix": ", aby odebrać swój klucz API.",
   "provider.connect.oauth.code.visit.prefix": "Odwiedź ",
   "provider.connect.oauth.code.visit.link": "ten link",

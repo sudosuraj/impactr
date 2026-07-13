@@ -282,9 +282,9 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                     initialRoute={
                                       input.args.continue
                                         ? {
-                                            type: "session",
-                                            sessionID: "dummy",
-                                          }
+                                          type: "session",
+                                          sessionID: "dummy",
+                                        }
                                         : undefined
                                     }
                                   >
@@ -742,18 +742,18 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
       },
       ...(sync.data.console_state.switchableOrgCount > 1
         ? [
-            {
-              name: "console.org.switch",
-              title: "Switch org",
-              suggested: Boolean(sync.data.console_state.activeOrgName),
-              slashName: "org",
-              slashAliases: ["orgs", "switch-org"],
-              run: () => {
-                dialog.replace(() => <DialogConsoleOrg />)
-              },
-              category: "Provider",
+          {
+            name: "console.org.switch",
+            title: "Switch org",
+            suggested: Boolean(sync.data.console_state.activeOrgName),
+            slashName: "org",
+            slashAliases: ["orgs", "switch-org"],
+            run: () => {
+              dialog.replace(() => <DialogConsoleOrg />)
             },
-          ]
+            category: "Provider",
+          },
+        ]
         : []),
       {
         name: "impactr.status",
@@ -805,7 +805,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         name: "docs.open",
         title: "Open docs",
         run: () => {
-          open("https://impactr.ai/docs").catch(() => {})
+          open("https://impactr.dev/docs").catch(() => { })
           dialog.clear()
         },
         category: "System",

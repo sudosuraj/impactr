@@ -101,7 +101,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   meta = {
     description = "The open source coding agent";
-    homepage = "https://impactr.ai";
+    homepage = "https://impactr.dev";
     license = lib.licenses.mit;
     mainProgram = "impactr";
     inherit (node_modules.meta) platforms;

@@ -53,7 +53,7 @@ impactr konfiguracja
 
 ```json title="impactr.json" {3}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "model": "lmstudio/google/gemma-3n-e4b"
 }
 ```
@@ -70,7 +70,7 @@ Można globalnie skorzystać z opcji modelu poprzez plik config.
 
 ```jsonc title="impactr.jsonc" {7-12,19-24}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "openai": {
       "models": {
@@ -109,7 +109,7 @@ Można również zastosować alternatywne warianty, które wykluczają. Warianty
 
 ```jsonc title="impactr.jsonc" {6-21}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "impactr": {
       "models": {
@@ -174,7 +174,7 @@ Można uwzględnić warianty lub dodać własne:
 
 ```jsonc title="impactr.jsonc" {7-18}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "openai": {
       "models": {
@@ -211,7 +211,7 @@ Po uruchomieniu impactr sprawdzanie modeli w następującej kolejności:
 
    ```json title="impactr.json"
    {
-     "$schema": "https://impactr.ai/config.json",
+     "$schema": "https://impactr.dev/config.json",
      "model": "anthropic/claude-sonnet-4-20250514"
    }
    ```

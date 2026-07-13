@@ -29,8 +29,8 @@ describe("LLMGatewayPlugin", () => {
       const catalog = yield* Catalog.Service
       const integrations = yield* Integration.Service
       yield* integrations.transform((editor) => {
-        editor.update(Integration.ID.make("llmgateway"), () => {})
-        editor.update(Integration.ID.make("openrouter"), () => {})
+        editor.update(Integration.ID.make("llmgateway"), () => { })
+        editor.update(Integration.ID.make("openrouter"), () => { })
       })
       yield* catalog.transform((catalog) => {
         catalog.provider.update(ProviderV2.ID.make("llmgateway"), (provider) => {
@@ -41,12 +41,12 @@ describe("LLMGatewayPlugin", () => {
           }
           provider.request = { headers: { Existing: "value" }, body: {} }
         })
-        catalog.provider.update(ProviderV2.ID.openrouter, () => {})
+        catalog.provider.update(ProviderV2.ID.openrouter, () => { })
       })
       yield* addPlugin()
       expect((yield* catalog.provider.get(ProviderV2.ID.make("llmgateway")))?.request.headers).toEqual({
         Existing: "value",
-        "HTTP-Referer": "https://impactr.ai/",
+        "HTTP-Referer": "https://impactr.dev/",
         "X-Title": "impactr",
         "X-Source": "impactr",
       })
@@ -59,7 +59,7 @@ describe("LLMGatewayPlugin", () => {
       const catalog = yield* Catalog.Service
       const integrations = yield* Integration.Service
       yield* integrations.transform((editor) => {
-        editor.update(Integration.ID.make("llmgateway"), () => {})
+        editor.update(Integration.ID.make("llmgateway"), () => { })
       })
       yield* catalog.transform((catalog) => {
         catalog.provider.update(ProviderV2.ID.make("llmgateway"), (provider) => {

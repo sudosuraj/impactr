@@ -53,7 +53,7 @@ Impactr-konfigurasjon.
 
 ```json title="impactr.json" {3}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "model": "lmstudio/google/gemma-3n-e4b"
 }
 ```
@@ -70,7 +70,7 @@ Du kan konfigurere en modells alternativer globalt gjennom konfigurasjonen.
 
 ```jsonc title="impactr.jsonc" {7-12,19-24}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "openai": {
       "models": {
@@ -109,7 +109,7 @@ Du kan også definere tilpassede varianter som utvider de innebygde. Varianter l
 
 ```jsonc title="impactr.jsonc" {6-21}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "impactr": {
       "models": {
@@ -174,7 +174,7 @@ Du kan overstyre eksisterende varianter eller legge til dine egne:
 
 ```jsonc title="impactr.jsonc" {7-18}
 {
-  "$schema": "https://impactr.ai/config.json",
+  "$schema": "https://impactr.dev/config.json",
   "provider": {
     "openai": {
       "models": {
@@ -211,7 +211,7 @@ Når Impactr starter opp, ser den etter modeller i følgende prioriterte rekkef�
 
    ```json title="impactr.json"
    {
-     "$schema": "https://impactr.ai/config.json",
+     "$schema": "https://impactr.dev/config.json",
      "model": "anthropic/claude-sonnet-4-20250514"
    }
    ```

@@ -1,10 +1,10 @@
 # impactr VS Code Extension
 
-A Visual Studio Code extension that integrates [impactr](https://impactr.ai) directly into your development workflow.
+A Visual Studio Code extension that integrates [impactr](https://impactr.dev) directly into your development workflow.
 
 ## Prerequisites
 
-This extension requires the [impactr CLI](https://impactr.ai) to be installed on your system. Visit [impactr.ai](https://impactr.ai) for installation instructions.
+This extension requires the [impactr CLI](https://impactr.dev) to be installed on your system. Visit [impactr.dev](https://impactr.dev) for installation instructions.
 
 ## Features
 

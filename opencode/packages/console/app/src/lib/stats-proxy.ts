@@ -12,7 +12,7 @@ export async function statsProxy(evt: APIEvent) {
 
   const targetUrl = new URL(req.url)
   targetUrl.protocol = "https:"
-  targetUrl.hostname = Resource.App.stage === "production" ? "stats.impactr.ai" : "stats.dev.impactr.ai"
+  targetUrl.hostname = Resource.App.stage === "production" ? "stats.impactr.dev" : "stats.dev.impactr.dev"
   targetUrl.port = ""
 
   if (

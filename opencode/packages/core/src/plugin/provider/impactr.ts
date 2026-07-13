@@ -13,7 +13,7 @@ import { ConfigProviderV1 } from "../../v1/config/provider"
 import { ConfigProviderOptionsV1 } from "../../v1/config/provider-options"
 import { ConfigV1 } from "../../v1/config/config"
 
-const defaultServer = "https://console.impactr.ai"
+const defaultServer = "https://console.impactr.dev"
 const clientID = "impactr-cli"
 const methodID = Integration.MethodID.make("device")
 const RemoteResponse = Schema.Struct({ config: ConfigV1.Info })
@@ -91,10 +91,10 @@ export const ImpactrPlugin = define<HttpClient.HttpClient | EventV2.Service | Sc
       connected = connection !== undefined
       providers = credential
         ? yield* fetchProviders(http, credential).pipe(
-            Effect.catch((cause) =>
-              Effect.logWarning("failed to load impactr provider config", { cause }).pipe(Effect.as(undefined)),
-            ),
-          )
+          Effect.catch((cause) =>
+            Effect.logWarning("failed to load impactr provider config", { cause }).pipe(Effect.as(undefined)),
+          ),
+        )
         : undefined
     })
 
@@ -127,11 +127,11 @@ export const ImpactrPlugin = define<HttpClient.HttpClient | EventV2.Service | Sc
             if (config.provider !== undefined) {
               model.api = config.provider.npm
                 ? {
-                    id: model.api.id,
-                    type: "aisdk",
-                    package: config.provider.npm,
-                    url: config.provider.api,
-                  }
+                  id: model.api.id,
+                  type: "aisdk",
+                  package: config.provider.npm,
+                  url: config.provider.api,
+                }
                 : { id: model.api.id, type: "native", url: config.provider.api, settings: {} }
             }
             if (config.tool_call !== undefined) model.capabilities.tools = config.tool_call

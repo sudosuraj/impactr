@@ -1,5 +1,5 @@
 {
-  "$schema": "https://impactr.ai/tui.json",
+  "$schema": "https://impactr.dev/tui.json",
   "plugin": [
     [
       "./plugins/tui-smoke.tsx",

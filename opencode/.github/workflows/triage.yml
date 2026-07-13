@@ -38,7 +38,7 @@ jobs:
 
       - name: Install impactr
         if: steps.author.outputs.skip != 'true'
-        run: curl -fsSL https://impactr.ai/install | bash
+        run: curl -fsSL https://impactr.dev/install | bash
 
       - name: Triage issue
         if: steps.author.outputs.skip != 'true'

@@ -4,8 +4,8 @@ import stripAnsi from "strip-ansi"
 import { defaultConsoleUrl, formatAccountLabel, formatOrgLine } from "../../src/cli/cmd/account"
 
 describe("console account display", () => {
-  test("uses console.impactr.ai as the default login URL", () => {
-    expect(defaultConsoleUrl).toBe("https://console.impactr.ai")
+  test("uses console.impactr.dev as the default login URL", () => {
+    expect(defaultConsoleUrl).toBe("https://console.impactr.dev")
   })
 
   test("includes the account url in account labels", () => {

@@ -95,7 +95,7 @@ describe("GoogleVertexPlugin", () => {
           provider.api = {
             type: "aisdk",
             package: "@ai-sdk/openai-compatible",
-            url: "https://impactr.ai/zen/v1",
+            url: "https://impactr.dev/zen/v1",
           }
         }),
       )
@@ -332,13 +332,13 @@ describe("GoogleVertexPlugin", () => {
         }),
       )
       const originalFetch = fetch
-      ;(globalThis as typeof globalThis & { fetch: typeof fetch }).fetch = (async (
-        input: Parameters<typeof fetch>[0],
-        init?: RequestInit,
-      ) => {
-        fetchCalls.push({ input, init })
-        return new Response("ok")
-      }) as typeof fetch
+        ; (globalThis as typeof globalThis & { fetch: typeof fetch }).fetch = (async (
+          input: Parameters<typeof fetch>[0],
+          init?: RequestInit,
+        ) => {
+          fetchCalls.push({ input, init })
+          return new Response("ok")
+        }) as typeof fetch
       yield* Effect.acquireUseRelease(
         Effect.void,
         () =>
@@ -356,7 +356,7 @@ describe("GoogleVertexPlugin", () => {
           }),
         () =>
           Effect.sync(() => {
-            ;(globalThis as typeof globalThis & { fetch: typeof fetch }).fetch = originalFetch
+            ; (globalThis as typeof globalThis & { fetch: typeof fetch }).fetch = originalFetch
           }),
       )
       expect(fetchCalls).toHaveLength(1)
