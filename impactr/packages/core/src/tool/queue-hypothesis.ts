@@ -7,6 +7,7 @@ import { ToolRegistry } from "./registry"
 import { Tool } from "./tool"
 import { Tools } from "./tools"
 import { HypothesisQueue, node as HypothesisQueueNode } from "../session/hypothesis-queue"
+import { KnowledgeGraph, node as KnowledgeGraphNode } from "../knowledge/graph"
 import { PermissionV2 } from "../permission"
 
 export const name = "queue_hypothesis"
@@ -34,6 +35,7 @@ const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const tools = yield* Tools.Service
     const queue = yield* HypothesisQueue
+    const graph = yield* KnowledgeGraph
     const permission = yield* PermissionV2.Service
 
     yield* tools
@@ -57,11 +59,18 @@ const layer = Layer.effectDiscard(
               .pipe(
                 Effect.mapError(() => new ToolFailure({ message: "Permission denied: queue_hypothesis" })),
                 Effect.andThen(
-                  queue.push(context.sessionID, {
-                    sourceFindingId: input.sourceFindingId,
-                    description: input.description,
-                    priority: input.priority,
-                  }).pipe(Effect.orDie)
+                  // Prioritize by the source finding's computed potential
+                  // (novelty × impact × confidence). Fall back to the model's
+                  // stated priority when the finding has no score yet.
+                  graph.getPotentialScore(input.sourceFindingId).pipe(
+                    Effect.flatMap((potential) =>
+                      queue.push(context.sessionID, {
+                        sourceFindingId: input.sourceFindingId,
+                        description: input.description,
+                        priority: potential > 0 ? potential : input.priority,
+                      }).pipe(Effect.orDie),
+                    ),
+                  ),
                 ),
                 Effect.map((hypothesisId) => ({ hypothesisId: hypothesisId as string })),
               ),
@@ -74,5 +83,5 @@ const layer = Layer.effectDiscard(
 export const node = makeLocationNode({
   name: "tool/queue-hypothesis",
   layer,
-  deps: [ToolRegistry.node, PermissionV2.node, HypothesisQueueNode],
+  deps: [ToolRegistry.node, PermissionV2.node, HypothesisQueueNode, KnowledgeGraphNode],
 })

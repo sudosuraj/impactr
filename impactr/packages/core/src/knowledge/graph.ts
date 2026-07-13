@@ -2,7 +2,18 @@ import { Effect, Context, Layer } from "effect"
 import { Database } from "../database/database"
 import { GraphNodeTable } from "./sql"
 import { makeGlobalNode } from "../effect/app-node"
-import { eq, and } from "drizzle-orm"
+import { eq } from "drizzle-orm"
+
+export interface Finding {
+  readonly id: string
+  readonly type: string
+  readonly data: unknown
+  readonly noveltyScore: number
+  readonly confidenceScore: number
+  readonly impactScore: number
+  /** novelty × impact × confidence — the priority signal for future exploration. */
+  readonly potential: number
+}
 
 export interface Interface {
   readonly addFinding: (
@@ -16,9 +27,10 @@ export interface Interface {
     }
   ) => Effect.Effect<string>
 
-  readonly queryContext: (sessionId: string, query: string) => Effect.Effect<ReadonlyArray<unknown>>
-  
-  // Potential score is used by the hypothesis queue
+  /** Highest-potential findings recorded for a session, so past discoveries inform future exploration. */
+  readonly summarize: (sessionId: string, limit: number) => Effect.Effect<ReadonlyArray<Finding>>
+
+  // Potential score is used by the hypothesis queue to prioritize investigation.
   readonly getPotentialScore: (findingId: string) => Effect.Effect<number>
 }
 
@@ -46,15 +58,24 @@ export const layer = Layer.effect(
           return id
         }),
 
-      queryContext: (sessionId, query) =>
+      summarize: (sessionId, limit) =>
         Effect.gen(function* () {
-          // Simplistic implementation for now; could be expanded with embedding similarity
           const nodes = yield* db.select()
             .from(GraphNodeTable)
             .where(eq(GraphNodeTable.session_id, sessionId as any))
-            .limit(50)
             .pipe(Effect.orDie)
           return nodes
+            .map((n) => ({
+              id: n.id,
+              type: n.type,
+              data: n.data,
+              noveltyScore: n.novelty_score,
+              confidenceScore: n.confidence_score,
+              impactScore: n.impact_score,
+              potential: n.novelty_score * n.impact_score * n.confidence_score,
+            }))
+            .sort((a, b) => b.potential - a.potential)
+            .slice(0, limit)
         }),
 
       getPotentialScore: (findingId) =>

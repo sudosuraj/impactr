@@ -11,6 +11,9 @@ import { PermissionV2 } from "../permission"
 
 export const name = "attack_graph"
 
+/** A node re-added at least this many times signals the agent is looping on one asset. */
+const LOOP_THRESHOLD = 3
+
 export const description =
   "Interact with the global Attack Graph. Add nodes (targets, findings), add edges (relationships), update node status, or query the graph to understand your current pentesting state."
 
@@ -71,14 +74,18 @@ const layer = Layer.effectDiscard(
                           summary = "Error: nodeId, nodeType, nodeLabel, and nodeStatus are required to add a node."
                           break
                         }
-                        const node = yield* graph.addNode({
+                        const node = yield* graph.addNode(context.sessionID, {
                           id: input.nodeId,
                           type: input.nodeType,
                           label: input.nodeLabel,
                           attributes: input.nodeAttributes ?? {},
                           status: input.nodeStatus,
                         })
-                        summary = `Node added/retrieved:\n${JSON.stringify(node, null, 2)}`
+                        const loopWarning =
+                          node.loopCount >= LOOP_THRESHOLD
+                            ? `\n\n⚠ Possible loop: this node has been added ${node.loopCount} times. You are circling a known asset — pick a different lead or escalate instead of re-enumerating it.`
+                            : ""
+                        summary = `Node added/retrieved:\n${JSON.stringify(node, null, 2)}${loopWarning}`
                         break
                       }
                       case "add_edge": {
@@ -86,7 +93,7 @@ const layer = Layer.effectDiscard(
                           summary = "Error: source, target, and relation are required to add an edge."
                           break
                         }
-                        yield* graph.addEdge({
+                        yield* graph.addEdge(context.sessionID, {
                           source: input.source,
                           target: input.target,
                           relation: input.relation,
@@ -100,7 +107,7 @@ const layer = Layer.effectDiscard(
                           summary = "Error: nodeId and nodeStatus are required to update a node."
                           break
                         }
-                        const node = yield* graph.updateNodeStatus(input.nodeId, input.nodeStatus)
+                        const node = yield* graph.updateNodeStatus(context.sessionID, input.nodeId, input.nodeStatus)
                         summary = node
                           ? `Node ${input.nodeId} status updated to ${input.nodeStatus}.`
                           : `Node ${input.nodeId} not found.`
@@ -111,12 +118,12 @@ const layer = Layer.effectDiscard(
                           summary = "Error: nodeId is required."
                           break
                         }
-                        const node = yield* graph.getNode(input.nodeId)
+                        const node = yield* graph.getNode(context.sessionID, input.nodeId)
                         if (!node) {
                           summary = `Node ${input.nodeId} not found.`
                           break
                         }
-                        const neighbors = yield* graph.getNeighbors(input.nodeId)
+                        const neighbors = yield* graph.getNeighbors(context.sessionID, input.nodeId)
                         summary = `Node Info:\n${JSON.stringify(node, null, 2)}\n\nNeighbors:\n${JSON.stringify(
                           neighbors.map((n) => n.id),
                           null,
@@ -125,14 +132,21 @@ const layer = Layer.effectDiscard(
                         break
                       }
                       case "query": {
-                        const graphState = yield* graph.getGraph()
+                        const graphState = yield* graph.getGraph(context.sessionID)
+                        const stuck = Object.values(graphState.nodes).filter((n) => n.loopCount >= LOOP_THRESHOLD)
+                        const stuckSection =
+                          stuck.length === 0
+                            ? ""
+                            : `\n\n⚠ Stuck nodes (loopCount >= ${LOOP_THRESHOLD}):\n${stuck
+                                .map((n) => `- ${n.id} (${n.loopCount})`)
+                                .join("\n")}`
                         summary = `Attack Graph Summary:\nTotal Nodes: ${
                           Object.keys(graphState.nodes).length
                         }\nTotal Edges: ${graphState.edges.length}\n\nNodes:\n${JSON.stringify(
                           graphState.nodes,
                           null,
                           2,
-                        )}\n\nEdges:\n${JSON.stringify(graphState.edges, null, 2)}`
+                        )}\n\nEdges:\n${JSON.stringify(graphState.edges, null, 2)}${stuckSection}`
                         break
                       }
                     }

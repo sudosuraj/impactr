@@ -48,6 +48,7 @@ import { MemoryEmbedder } from "../../memory/embedder"
 import * as SessionBudget from "../budget"
 import * as KnowledgeSaturation from "../saturation"
 import * as HypothesisQueue from "../hypothesis-queue"
+import * as KnowledgeGraph from "../../knowledge/graph"
 
 /**
  * Runs one durable coding-agent Session until it settles.
@@ -120,6 +121,7 @@ const layer = Layer.effect(
     const budget = yield* SessionBudget.SessionBudget
     const saturation = yield* KnowledgeSaturation.KnowledgeSaturation
     const hypothesisQueue = yield* HypothesisQueue.HypothesisQueue
+    const knowledgeGraph = yield* KnowledgeGraph.KnowledgeGraph
     const projectId = location.project.id
     const compaction = SessionCompaction.make({
       events,
@@ -463,7 +465,7 @@ const layer = Layer.effect(
             needsContinuation = yield* SessionInput.hasPending(db, input.sessionID, "steer")
             if (!needsContinuation && fixAttempts < 3) {
               const session = yield* store.get(input.sessionID)
-              if (session && (session.agent === "build" || session.agent === "orchestrator")) {
+              if (session && session.agent === "build") {
                 const packageJsonPath = path.join(location.directory, "package.json")
                 const hasPackageJson = yield* fs.exists(packageJsonPath).pipe(Effect.catch(() => Effect.succeed(false)))
                 let testCommandStr = ""
@@ -518,12 +520,25 @@ const layer = Layer.effect(
             const nextHypothesis = yield* hypothesisQueue.popHighestPriority(input.sessionID)
             if (nextHypothesis) {
               activeHypothesisId = nextHypothesis.id
+              // Feed the highest-potential findings back in so the agent
+              // reasons over what it already knows instead of re-discovering it.
+              const findings = yield* knowledgeGraph.summarize(input.sessionID, 8)
+              const digest =
+                findings.length === 0
+                  ? ""
+                  : `\n\nKnown findings so far (top by potential = novelty × impact × confidence):\n${findings
+                      .map((f) => {
+                        const data = JSON.stringify(f.data)
+                        const shown = data.length > 200 ? `${data.slice(0, 200)}…` : data
+                        return `- [${f.type}] ${shown} (potential ${f.potential.toFixed(2)})`
+                      })
+                      .join("\n")}`
               const messageID = SessionMessage.ID.create()
               yield* SessionInput.admit(db, events, {
                 id: messageID,
                 sessionID: input.sessionID,
                 prompt: Prompt.make({
-                  text: `Exploring hypothesis: ${nextHypothesis.description}`,
+                  text: `Exploring hypothesis: ${nextHypothesis.description}${digest}`,
                 }),
                 delivery: "queue",
               })
@@ -564,5 +579,6 @@ export const node = makeLocationNode({
     SessionBudget.node,
     KnowledgeSaturation.node,
     HypothesisQueue.node,
+    KnowledgeGraph.node,
   ],
 })

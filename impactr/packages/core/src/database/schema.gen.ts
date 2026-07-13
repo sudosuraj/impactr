@@ -269,6 +269,77 @@ export default {
       yield* tx.run(`CREATE INDEX \`session_workspace_idx\` ON \`session\` (\`workspace_id\`);`)
       yield* tx.run(`CREATE INDEX \`session_parent_idx\` ON \`session\` (\`parent_id\`);`)
       yield* tx.run(`CREATE INDEX \`todo_session_idx\` ON \`todo\` (\`session_id\`);`)
+      yield* tx.run(`
+        CREATE TABLE \`graph_node\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`type\` text NOT NULL,
+          \`data\` text NOT NULL,
+          \`novelty_score\` real NOT NULL,
+          \`confidence_score\` real NOT NULL,
+          \`impact_score\` real NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          CONSTRAINT \`fk_graph_node_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`CREATE INDEX \`graph_node_session_idx\` ON \`graph_node\` (\`session_id\`);`)
+      yield* tx.run(`CREATE INDEX \`graph_node_type_idx\` ON \`graph_node\` (\`type\`);`)
+      yield* tx.run(`
+        CREATE TABLE \`graph_edge\` (
+          \`source_id\` text NOT NULL,
+          \`target_id\` text NOT NULL,
+          \`relation_type\` text NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          CONSTRAINT \`fk_graph_edge_source_id_graph_node_id_fk\` FOREIGN KEY (\`source_id\`) REFERENCES \`graph_node\`(\`id\`) ON DELETE CASCADE,
+          CONSTRAINT \`fk_graph_edge_target_id_graph_node_id_fk\` FOREIGN KEY (\`target_id\`) REFERENCES \`graph_node\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`CREATE INDEX \`graph_edge_source_idx\` ON \`graph_edge\` (\`source_id\`);`)
+      yield* tx.run(`CREATE INDEX \`graph_edge_target_idx\` ON \`graph_edge\` (\`target_id\`);`)
+      yield* tx.run(`
+        CREATE TABLE \`hypothesis_queue\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`source_finding_id\` text NOT NULL,
+          \`description\` text NOT NULL,
+          \`priority\` real NOT NULL,
+          \`status\` text DEFAULT 'pending' NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          CONSTRAINT \`fk_hypothesis_queue_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`CREATE INDEX \`hypothesis_queue_session_idx\` ON \`hypothesis_queue\` (\`session_id\`);`)
+      yield* tx.run(`CREATE INDEX \`hypothesis_queue_status_idx\` ON \`hypothesis_queue\` (\`status\`);`)
+      yield* tx.run(`
+        CREATE TABLE \`attack_graph_node\` (
+          \`session_id\` text NOT NULL,
+          \`id\` text NOT NULL,
+          \`type\` text NOT NULL,
+          \`label\` text NOT NULL,
+          \`attributes\` text NOT NULL,
+          \`status\` text NOT NULL,
+          \`discovered_at\` integer NOT NULL,
+          \`loop_count\` integer DEFAULT 0 NOT NULL,
+          CONSTRAINT \`attack_graph_node_pk\` PRIMARY KEY(\`session_id\`, \`id\`),
+          CONSTRAINT \`fk_attack_graph_node_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`CREATE INDEX \`attack_graph_node_session_idx\` ON \`attack_graph_node\` (\`session_id\`);`)
+      yield* tx.run(`
+        CREATE TABLE \`attack_graph_edge\` (
+          \`session_id\` text NOT NULL,
+          \`source\` text NOT NULL,
+          \`target\` text NOT NULL,
+          \`relation\` text NOT NULL,
+          \`attributes\` text NOT NULL,
+          CONSTRAINT \`attack_graph_edge_pk\` PRIMARY KEY(\`session_id\`, \`source\`, \`target\`, \`relation\`),
+          CONSTRAINT \`fk_attack_graph_edge_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`CREATE INDEX \`attack_graph_edge_session_idx\` ON \`attack_graph_edge\` (\`session_id\`);`)
     })
   },
 } satisfies Omit<DatabaseMigration.Migration, "id">
