@@ -362,6 +362,28 @@
         "drizzle-kit": "catalog:",
       },
     },
+    "packages/dashboard": {
+      "name": "@impactr-ai/dashboard",
+      "version": "1.17.13",
+      "dependencies": {
+        "@impactr-ai/core": "workspace:*",
+        "@impactr-ai/schema": "workspace:*",
+        "@libsql/client": "0.17.4",
+        "@solidjs/router": "catalog:",
+        "@solidjs/start": "catalog:",
+        "@tailwindcss/vite": "catalog:",
+        "drizzle-orm": "catalog:",
+        "nitro": "3.0.1-alpha.1",
+        "solid-js": "catalog:",
+        "tailwindcss": "catalog:",
+        "vite": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "packages/desktop": {
       "name": "@impactr-ai/desktop",
       "version": "1.17.13",
@@ -1687,6 +1709,8 @@
     "@impactr-ai/console-support": ["@impactr-ai/console-support@workspace:packages/console/support"],
 
     "@impactr-ai/core": ["@impactr-ai/core@workspace:packages/core"],
+
+    "@impactr-ai/dashboard": ["@impactr-ai/dashboard@workspace:packages/dashboard"],
 
     "@impactr-ai/desktop": ["@impactr-ai/desktop@workspace:packages/desktop"],
 

@@ -1,0 +1,19 @@
+dist
+.output
+app.config.timestamp_*.js
+
+# Environment
+.env
+.env*.local
+
+# dependencies
+/node_modules
+
+# Local test DB
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# System Files
+.DS_Store

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@impactr-ai/dashboard",
+  "version": "1.17.13",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "dev": "vite dev --host 0.0.0.0",
+    "build": "vite build",
+    "start": "vite start"
+  },
+  "dependencies": {
+    "@impactr-ai/core": "workspace:*",
+    "@impactr-ai/schema": "workspace:*",
+    "@libsql/client": "0.17.4",
+    "@solidjs/router": "catalog:",
+    "@solidjs/start": "catalog:",
+    "@tailwindcss/vite": "catalog:",
+    "drizzle-orm": "catalog:",
+    "nitro": "3.0.1-alpha.1",
+    "solid-js": "catalog:",
+    "tailwindcss": "catalog:",
+    "vite": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
