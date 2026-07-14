@@ -3,7 +3,11 @@ import { FindingTable } from "@impactr-ai/core/finding/hosted-sql"
 import { AsmAssetTable } from "@impactr-ai/core/asm-asset/hosted-sql"
 import { EngagementTable, EngagementAuditLogTable } from "@impactr-ai/core/engagement/hosted-sql"
 import { OrganizationTable, UserTable, MembershipTable } from "@impactr-ai/core/organization/hosted-sql"
-import { HostedAttackGraphNodeTable, HostedAttackGraphEdgeTable } from "@impactr-ai/core/database/hosted/pentest-sql"
+import {
+  HostedAttackGraphNodeTable,
+  HostedAttackGraphEdgeTable,
+  HostedHypothesisQueueTable,
+} from "@impactr-ai/core/database/hosted/pentest-sql"
 
 const schema = {
   FindingTable,
@@ -15,6 +19,7 @@ const schema = {
   MembershipTable,
   HostedAttackGraphNodeTable,
   HostedAttackGraphEdgeTable,
+  HostedHypothesisQueueTable,
 }
 
 const url = process.env.DATABASE_URL
@@ -35,4 +40,5 @@ export {
   MembershipTable,
   HostedAttackGraphNodeTable,
   HostedAttackGraphEdgeTable,
+  HostedHypothesisQueueTable,
 }
