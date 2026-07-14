@@ -11,7 +11,7 @@ import {
   ToolFailure,
   type ToolCall,
 } from "@impactr-ai/llm"
-import { Effect, Layer, Schema, Stream } from "effect"
+import { Clock, Effect, Layer, Schema, Stream } from "effect"
 import { makeLocationNode } from "../effect/app-node"
 import { llmClient } from "../effect/app-node-platform"
 import { AgentV2 } from "../agent"
@@ -30,6 +30,12 @@ import { BackgroundJob } from "../background-job"
 export const name = "run_agent"
 export const batchName = "run_agents"
 
+/** Reads a positive-integer override from the environment, else the fallback. */
+const envPositiveInt = (variable: string, fallback: number) => {
+  const parsed = Number(process.env[variable])
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
 /**
  * Fallback ceiling on a subagent's tool-call rounds when its definition does not
  * pin an explicit `steps` limit. Real recon/exploitation work needs many rounds
@@ -42,16 +48,18 @@ const MAX_SUBAGENT_STEPS = 100
  * Upper bound on how many subagents `run_agents` runs at once. The whole point of
  * the batch tool is real parallelism, but each subagent is a full LLM loop, so an
  * unbounded fan-out would exhaust provider rate limits and local resources. Tasks
- * beyond this run as capacity frees up.
+ * beyond this run as capacity frees up. Tune per deployment via
+ * IMPACTR_MAX_PARALLEL_SUBAGENTS (e.g. a larger pool for cheap-model recon).
  */
-const MAX_PARALLEL_SUBAGENTS = 8
+const MAX_PARALLEL_SUBAGENTS = envPositiveInt("IMPACTR_MAX_PARALLEL_SUBAGENTS", 8)
 
 /**
  * Upper bound on how many of a single turn's tool calls settle at once. Models
  * usually emit only a few, but bounding avoids spawning an unbounded number of
- * heavy scan processes when one does emit many.
+ * heavy scan processes when one does emit many. Tune via
+ * IMPACTR_MAX_PARALLEL_TOOL_CALLS.
  */
-const MAX_PARALLEL_TOOL_CALLS = 8
+const MAX_PARALLEL_TOOL_CALLS = envPositiveInt("IMPACTR_MAX_PARALLEL_TOOL_CALLS", 8)
 
 /**
  * Generous ceiling on the text a subagent hands back to the orchestrator. A
@@ -157,6 +165,7 @@ const layer = Layer.effectDiscard(
           : context.sessionID
         const promptCacheKey = `${baseCacheKey}:${subagent.id}`
 
+        const startedAt = yield* Clock.currentTimeMillis
         let currentStep = 1
         let messages: Message[] = [Message.user(spec.prompt)]
         let finalOutput = ""
@@ -230,6 +239,17 @@ const layer = Layer.effectDiscard(
           }
         }
 
+        // Efficiency telemetry: rounds used, output size, model, and wall time per
+        // subagent, so cost/latency per delegation is measurable and tunable.
+        yield* Effect.logInfo("subagent settled", {
+          agent: spec.agent,
+          model: model.id,
+          steps: currentStep,
+          maxSteps,
+          outputChars: finalOutput.length,
+          elapsedMs: (yield* Clock.currentTimeMillis) - startedAt,
+        })
+
         return boundOutput(finalOutput)
       })
 
@@ -266,6 +286,7 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               if (input.tasks.length === 0) return { output: "No tasks provided." }
+              const startedAt = yield* Clock.currentTimeMillis
               const results = yield* Effect.all(
                 input.tasks.map((task, index) =>
                   runSubagent(task, context).pipe(
@@ -282,6 +303,14 @@ const layer = Layer.effectDiscard(
                 ),
                 { concurrency: MAX_PARALLEL_SUBAGENTS },
               )
+              // Batch telemetry: wall time is the slowest task, not the sum, when the
+              // pool absorbs the fan-out — the signal that parallelism is working.
+              yield* Effect.logInfo("run_agents batch settled", {
+                tasks: results.length,
+                failures: results.filter((result) => result.error !== undefined).length,
+                concurrency: MAX_PARALLEL_SUBAGENTS,
+                elapsedMs: (yield* Clock.currentTimeMillis) - startedAt,
+              })
               const combined = results
                 .map((result) => {
                   const header = `### [${result.index}] ${result.agent}`
