@@ -26,22 +26,29 @@ const config = Config.all({
   authToken: Config.nonEmptyString("DATABASE_AUTH_TOKEN").pipe(Config.option),
 }).pipe(Config.option)
 
-const layer = Layer.effect(
-  Service,
-  Effect.gen(function* () {
-    const settings = yield* config.parse(ConfigProvider.fromEnv())
+const unconfigured = Layer.succeed(Service, { db: Option.none() })
 
-    if (Option.isNone(settings)) return { db: Option.none() }
+const configured = (url: string, authToken: string | undefined) =>
+  Layer.effect(
+    Service,
+    Effect.gen(function* () {
+      const db = yield* makeDatabase
+      yield* db.run("PRAGMA foreign_keys = ON")
+      yield* DatabaseMigration.applyOnly(db, migrations)
+      return { db: Option.some(db) }
+    }).pipe(Effect.orDie),
+  ).pipe(Layer.provide(LibsqlClient.layer({ url, authToken })))
 
-    const { url, authToken } = settings.value
-    const db = yield* makeDatabase.pipe(
-      Effect.provide(LibsqlClient.layer({ url, authToken: Option.getOrUndefined(authToken) })),
-    )
-    yield* db.run("PRAGMA foreign_keys = ON")
-    yield* DatabaseMigration.applyOnly(db, migrations)
-
-    return { db: Option.some(db) }
-  }).pipe(Effect.orDie),
+// The driver layer must be composed via Layer.provide (not Effect.provide inside the
+// Effect.gen above) so its connection stays open for the Service's whole lifetime rather
+// than being torn down the moment `db` is constructed.
+export const layer = Layer.unwrap(
+  config.parse(ConfigProvider.fromEnv()).pipe(
+    Effect.map((settings) =>
+      Option.isNone(settings) ? unconfigured : configured(settings.value.url, Option.getOrUndefined(settings.value.authToken)),
+    ),
+    Effect.orDie,
+  ),
 )
 
 export const node = makeGlobalNode({ service: Service, layer, deps: [] })

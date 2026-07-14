@@ -16,6 +16,13 @@ export default function Login() {
           placeholder="you@company.com"
           class="w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-neutral-100 placeholder:text-neutral-600"
         />
+        <input
+          name="password"
+          type="password"
+          required
+          placeholder="Password"
+          class="w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-neutral-100 placeholder:text-neutral-600"
+        />
         {submission.result?.error && <p class="text-sm text-red-400">{submission.result.error}</p>}
         <button
           type="submit"

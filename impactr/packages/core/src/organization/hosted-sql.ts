@@ -13,6 +13,8 @@ export const UserTable = sqliteTable("user", {
   id: text().$type<OrganizationSchema.UserID>().primaryKey(),
   email: text().notNull().unique(),
   name: text().notNull(),
+  // Bun.password hash (argon2id). Never exposed via @impactr-ai/schema/user's public Info type.
+  password_hash: text().notNull(),
   ...Timestamps,
 })
 

@@ -3,19 +3,19 @@ import { eq } from "drizzle-orm"
 import { db, MembershipTable, UserTable } from "./db"
 import { useAuthSession } from "./session"
 
-/**
- * Stub login for issue #6 — resolves email -> user -> membership -> organization with no
- * password check. This is intentionally insecure and exists only to exercise the dashboard
- * against real per-org data before issue #5 lands. Replace the credential check here; the
- * user/membership/organization resolution below should stay as-is.
- */
+// Verified against on a missing user so a failed lookup takes roughly the same time as a
+// failed password check — avoids trivially leaking which emails have accounts.
+const DUMMY_HASH = await Bun.password.hash(crypto.randomUUID())
+
 export const login = action(async (formData: FormData) => {
   "use server"
   const email = String(formData.get("email") ?? "").trim().toLowerCase()
-  if (!email) return { error: "Email is required" }
+  const password = String(formData.get("password") ?? "")
+  if (!email || !password) return { error: "Email and password are required" }
 
   const user = await db.select().from(UserTable).where(eq(UserTable.email, email)).get()
-  if (!user) return { error: "No account found for that email" }
+  const valid = await Bun.password.verify(password, user?.password_hash ?? DUMMY_HASH)
+  if (!user || !valid) return { error: "Invalid email or password" }
 
   const membership = await db.select().from(MembershipTable).where(eq(MembershipTable.user_id, user.id)).get()
   if (!membership) return { error: "That account has no organization membership" }
