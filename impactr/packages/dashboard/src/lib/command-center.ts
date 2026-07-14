@@ -67,6 +67,22 @@ interface GraphNode {
   readonly status: string
 }
 
+export interface MapNode {
+  readonly id: string
+  readonly type: string
+  readonly label: string
+  readonly status: string
+}
+export interface MapEdge {
+  readonly source: string
+  readonly target: string
+}
+
+/** Show the most active part of the graph first when we cap the node map. */
+const STATUS_RANK: Record<string, number> = { compromised: 0, exploiting: 1, enumerating: 2, pending: 3, dead_end: 4 }
+const MAP_NODE_CAP = 90
+const MAP_EDGE_CAP = 260
+
 /** Walk edges backward from each impactful terminal to assemble a foothold→…→impact narrative. */
 function assembleChains(nodes: GraphNode[], edges: { source: string; target: string }[]): Chain[] {
   const byId = new Map<string, GraphNode>(nodes.map((n) => [n.id, n]))
@@ -207,6 +223,16 @@ async function assemble(organizationID: string) {
     ...nodes.map((n) => n.discovered),
   ])
 
+  const mapNodes: MapNode[] = [...nodes]
+    .sort((a, b) => (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9))
+    .slice(0, MAP_NODE_CAP)
+    .map((n) => ({ id: n.id, type: n.type, label: n.label, status: n.status }))
+  const mapIds = new Set(mapNodes.map((n) => n.id))
+  const mapEdges: MapEdge[] = edges
+    .filter((e) => mapIds.has(e.source) && mapIds.has(e.target))
+    .slice(0, MAP_EDGE_CAP)
+    .map((e) => ({ source: e.source, target: e.target }))
+
   return {
     kpis: {
       surface: assets.length,
@@ -220,6 +246,7 @@ async function assemble(organizationID: string) {
     chains: assembleChains(nodes, edges),
     leads: leads.map((l) => ({ id: l.id, description: l.description, priority: l.priority, status: l.status })),
     terrain,
+    graph: { nodes: mapNodes, edges: mapEdges },
   }
 }
 

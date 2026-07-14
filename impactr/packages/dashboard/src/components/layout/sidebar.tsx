@@ -32,8 +32,8 @@ export function Sidebar() {
             <A
               href={item.href}
               end={item.href === "/"}
-              class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground"
-              activeClass="!bg-surface-raised !text-foreground font-medium"
+              class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors before:absolute before:left-0 before:top-1/2 before:h-4 before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-transparent before:content-[''] hover:bg-surface-raised hover:text-foreground"
+              activeClass="!bg-surface-raised !text-foreground font-medium before:!bg-brand"
             >
               <item.icon class="h-4 w-4 shrink-0" />
               {item.label}

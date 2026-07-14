@@ -9,6 +9,7 @@ import { ExposureRing } from "~/components/dashboard/exposure-ring"
 import { IntrusionChains } from "~/components/dashboard/intrusion-chains"
 import { WorkingLeads } from "~/components/dashboard/working-leads"
 import { SurfaceTerrain } from "~/components/dashboard/surface-terrain"
+import { AttackGraphMap } from "~/components/dashboard/attack-graph-map"
 import { getCommandCenter } from "~/lib/command-center"
 
 export default function Dashboard() {
@@ -115,6 +116,14 @@ export default function Dashboard() {
                   <WorkingLeads leads={d().leads} />
                 </Card>
               </div>
+
+              <Card>
+                <CardHeader
+                  title="Attack graph"
+                  description="Assets and the relationships the agent has drawn between them"
+                />
+                <AttackGraphMap nodes={d().graph.nodes} edges={d().graph.edges} />
+              </Card>
 
               <Card>
                 <CardHeader
