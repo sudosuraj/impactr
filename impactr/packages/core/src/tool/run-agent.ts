@@ -53,6 +53,23 @@ const MAX_PARALLEL_SUBAGENTS = 8
  */
 const MAX_PARALLEL_TOOL_CALLS = 8
 
+/**
+ * Generous ceiling on the text a subagent hands back to the orchestrator. A
+ * subagent already returns only its final synthesis (raw tool output stays inside
+ * its own loop), so this rarely fires — but a runaway result would otherwise bloat
+ * every subsequent orchestrator turn. Kept high so normal structured output (e.g. a
+ * recon target list) is never cut; when it does fire, a marker tells the
+ * orchestrator to re-delegate a narrower task rather than silently losing data.
+ */
+const MAX_SUBAGENT_OUTPUT_CHARS = 32_000
+
+const boundOutput = (text: string) =>
+  text.length <= MAX_SUBAGENT_OUTPUT_CHARS
+    ? text
+    : `${text.slice(0, MAX_SUBAGENT_OUTPUT_CHARS)}\n\n[output truncated: ${
+        text.length - MAX_SUBAGENT_OUTPUT_CHARS
+      } more characters omitted — re-delegate a narrower task if you need the rest]`
+
 const AgentField = Schema.String.annotate({
   description:
     "The subagent to run. Pentest subagents: 'recon' (enumeration/scanning only), 'attack' (exploits one assigned vulnerability). Utility subagents: 'explore' (fast search), 'general' (multi-step reasoning). Any configured subagent id is accepted.",
@@ -213,7 +230,7 @@ const layer = Layer.effectDiscard(
           }
         }
 
-        return finalOutput
+        return boundOutput(finalOutput)
       })
 
     yield* tools
