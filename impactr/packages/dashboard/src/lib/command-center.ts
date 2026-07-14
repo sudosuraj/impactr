@@ -33,7 +33,7 @@ function depthOf(status: string): Depth {
 
 const CLASS_LABEL: Record<string, string> = {
   subdomain: "Subdomains",
-  ip: "Hosts / IP",
+  ip: "Hosts",
   port: "Services",
   endpoint: "Endpoints",
 }
@@ -96,7 +96,7 @@ function assembleChains(nodes: GraphNode[], edges: { source: string; target: str
 
   const terminals = nodes
     .filter((n) => n.status === "compromised" || n.status === "exploiting")
-    .sort((a) => (a.status === "compromised" ? -1 : 1))
+    .sort((a, b) => (a.status === "compromised" ? 0 : 1) - (b.status === "compromised" ? 0 : 1))
     .slice(0, 4)
 
   const chains: Chain[] = []
@@ -131,8 +131,17 @@ function assembleChains(nodes: GraphNode[], edges: { source: string; target: str
 function discoverySeries(timestamps: number[]) {
   if (timestamps.length === 0) return { series: [] as number[], peak: 0, current: 0, saturationPct: 0, spanHours: 0 }
   const hour = 3_600_000
-  const min = Math.min(...timestamps)
-  const max = Math.max(...timestamps)
+  const now = Date.now()
+  // Loop rather than Math.min(...timestamps): spreading a large array as arguments
+  // overflows the call-argument limit (~65k) and throws for big engagements.
+  let min = timestamps[0]
+  let max = timestamps[0]
+  for (const t of timestamps) {
+    if (t < min) min = t
+    if (t > max) max = t
+  }
+
+  // Chart shape: down-sample the whole span to at most 24 buckets.
   const buckets = Math.max(1, Math.min(24, Math.ceil((max - min) / hour) + 1))
   const size = Math.max(hour, Math.ceil((max - min) / buckets) || hour)
   const series = new Array(buckets).fill(0)
@@ -140,8 +149,19 @@ function discoverySeries(timestamps: number[]) {
     const idx = Math.min(buckets - 1, Math.floor((t - min) / size))
     series[idx]++
   }
-  const peak = Math.max(...series)
-  const current = series[series.length - 1]
+
+  // Metrics in true per-hour terms so they don't depend on the chart's bucket size.
+  // `current` is activity in the last real hour from now (not the last chart bucket,
+  // which can end hours ago) — this is what drives the agent active/idle indicator.
+  const hourly = new Map<number, number>()
+  for (const t of timestamps) {
+    const h = Math.floor(t / hour)
+    hourly.set(h, (hourly.get(h) ?? 0) + 1)
+  }
+  let peak = 0
+  for (const count of hourly.values()) if (count > peak) peak = count
+  let current = 0
+  for (const t of timestamps) if (t >= now - hour) current++
   const saturationPct = peak > 0 ? Math.max(0, Math.min(100, Math.round((1 - current / peak) * 100))) : 0
   return { series, peak, current, saturationPct, spanHours: Math.round((max - min) / hour) }
 }
