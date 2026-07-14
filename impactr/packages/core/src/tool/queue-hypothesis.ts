@@ -12,6 +12,9 @@ import { PermissionV2 } from "../permission"
 
 export const name = "queue_hypothesis"
 
+/** Clamp a model-supplied priority into [0,1] so it stays comparable with computed potential scores. */
+const clamp01 = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0)
+
 export const description = `Use this tool to queue a new hypothesis or task for future exploration.
 When you discover something interesting that requires a separate focused investigation, you should queue a hypothesis for it instead of getting distracted.
 This allows the Continuous Discovery Engine to prioritize and schedule the investigation properly.`
@@ -67,7 +70,7 @@ const layer = Layer.effectDiscard(
                       queue.push(context.sessionID, {
                         sourceFindingId: input.sourceFindingId,
                         description: input.description,
-                        priority: potential > 0 ? potential : input.priority,
+                        priority: potential > 0 ? potential : clamp01(input.priority),
                       }).pipe(Effect.orDie),
                     ),
                   ),
