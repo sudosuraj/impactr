@@ -23,6 +23,7 @@ import { Organization } from "@impactr-ai/schema/organization"
 import { User } from "@impactr-ai/schema/user"
 import { Engagement } from "@impactr-ai/schema/engagement"
 import { OrganizationTable, UserTable, MembershipTable } from "../src/organization/hosted-sql"
+import { Password } from "../src/organization/password"
 import { EngagementTable, EngagementAuditLogTable } from "../src/engagement/hosted-sql"
 
 const args = parseArgs({
@@ -60,7 +61,7 @@ const db = drizzle({
 })
 
 const password = args.password ?? crypto.randomUUID()
-const passwordHash = await Bun.password.hash(password)
+const passwordHash = await Password.hash(password)
 const now = Date.now()
 
 const organizationID = Organization.ID.create()

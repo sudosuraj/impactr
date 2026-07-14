@@ -1,11 +1,12 @@
 import { action, redirect } from "@solidjs/router"
 import { eq } from "drizzle-orm"
+import { Password } from "@impactr-ai/core/organization/password"
 import { db, MembershipTable, UserTable } from "./db"
 import { useAuthSession } from "./session"
 
 // Verified against on a missing user so a failed lookup takes roughly the same time as a
 // failed password check — avoids trivially leaking which emails have accounts.
-const DUMMY_HASH = await Bun.password.hash(crypto.randomUUID())
+const DUMMY_HASH = await Password.hash(crypto.randomUUID())
 
 export const login = action(async (formData: FormData) => {
   "use server"
@@ -14,7 +15,7 @@ export const login = action(async (formData: FormData) => {
   if (!email || !password) return { error: "Email and password are required" }
 
   const user = await db.select().from(UserTable).where(eq(UserTable.email, email)).get()
-  const valid = await Bun.password.verify(password, user?.password_hash ?? DUMMY_HASH)
+  const valid = await Password.verify(password, user?.password_hash ?? DUMMY_HASH)
   if (!user || !valid) return { error: "Invalid email or password" }
 
   const membership = await db.select().from(MembershipTable).where(eq(MembershipTable.user_id, user.id)).get()
@@ -46,5 +47,17 @@ export async function requireSession() {
   "use server"
   const session = await useAuthSession()
   if (!session.data.organizationID) throw redirect("/login")
+  return session.data as Required<typeof session.data>
+}
+
+/**
+ * Like requireSession, but for JSON API routes: returns undefined instead of redirecting, so
+ * callers turn a missing session into a 401 rather than an HTML redirect. Reuses the same
+ * cookie session as the dashboard pages — a programmatic (non-browser) client cannot
+ * authenticate against these routes yet; that needs its own API-key scheme (not built here).
+ */
+export async function requireApiSession() {
+  const session = await useAuthSession()
+  if (!session.data.organizationID) return undefined
   return session.data as Required<typeof session.data>
 }

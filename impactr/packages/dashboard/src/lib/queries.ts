@@ -1,5 +1,5 @@
 import { and, desc, eq } from "drizzle-orm"
-import { db, AsmAssetTable, EngagementTable, FindingTable } from "./db"
+import { db, AsmAssetTable, EngagementTable, FindingTable, HostedAttackGraphEdgeTable, HostedAttackGraphNodeTable } from "./db"
 
 /**
  * Every query here joins through `engagement.organization_id` — the tenant-isolation
@@ -34,4 +34,23 @@ export function listAssets(organizationID: string) {
     .where(eq(EngagementTable.organization_id, organizationID as any))
     .orderBy(desc(AsmAssetTable.discovered_at))
     .then((rows) => rows.map((row) => row.asset))
+}
+
+export async function getAttackGraphSummary(organizationID: string) {
+  const nodes = await db
+    .select({ status: HostedAttackGraphNodeTable.status })
+    .from(HostedAttackGraphNodeTable)
+    .innerJoin(EngagementTable, eq(HostedAttackGraphNodeTable.engagement_id, EngagementTable.id))
+    .where(eq(EngagementTable.organization_id, organizationID as any))
+
+  const edges = await db
+    .select({ id: HostedAttackGraphEdgeTable.source })
+    .from(HostedAttackGraphEdgeTable)
+    .innerJoin(EngagementTable, eq(HostedAttackGraphEdgeTable.engagement_id, EngagementTable.id))
+    .where(eq(EngagementTable.organization_id, organizationID as any))
+
+  const byStatus: Record<string, number> = {}
+  for (const node of nodes) byStatus[node.status] = (byStatus[node.status] ?? 0) + 1
+
+  return { totalNodes: nodes.length, totalEdges: edges.length, byStatus }
 }
