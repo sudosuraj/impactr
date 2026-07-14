@@ -26,6 +26,7 @@ import { Tools } from "./tools"
 import { SessionStore } from "../session/store"
 import { SessionRunnerModel } from "../session/runner/model"
 import { BackgroundJob } from "../background-job"
+import * as SessionBudget from "../session/budget"
 
 export const name = "run_agent"
 export const batchName = "run_agents"
@@ -36,13 +37,11 @@ const envPositiveInt = (variable: string, fallback: number) => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
 }
 
-/**
- * Fallback ceiling on a subagent's tool-call rounds when its definition does not
- * pin an explicit `steps` limit. Real recon/exploitation work needs many rounds
- * (scan → parse → pivot → re-scan), so this is deliberately high; a subagent
- * settles earlier by simply returning text with no further tool calls.
- */
-const MAX_SUBAGENT_STEPS = 100
+/** Reads a positive-integer override from the environment, or undefined if unset/invalid. */
+const envOptionalPositiveInt = (variable: string) => {
+  const parsed = Number(process.env[variable])
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
+}
 
 /**
  * Upper bound on how many subagents `run_agents` runs at once. The whole point of
@@ -126,6 +125,7 @@ const layer = Layer.effectDiscard(
     const models = yield* SessionRunnerModel.Service
     const toolRegistry = yield* ToolRegistry.Service
     const backgroundJobs = yield* BackgroundJob.Service
+    const budget = yield* SessionBudget.SessionBudget
 
     const loadSystemContext = (agent: AgentV2.Selection) =>
       Effect.all([systemContext.load(), skillGuidance.load(agent), referenceGuidance.load()], {
@@ -147,7 +147,12 @@ const layer = Layer.effectDiscard(
         const model = yield* models.resolve(
           subagent.info.model ? { ...session, model: subagent.info.model } : session,
         )
-        const maxSteps = subagent.info.steps ?? MAX_SUBAGENT_STEPS
+        // No artificial iteration ceiling. A subagent runs until it naturally stops
+        // calling tools (its task is done) or the session budget is exhausted — the
+        // same termination model as the orchestrator session. A hard step cap applies
+        // only if the agent explicitly sets `steps` or the operator sets
+        // IMPACTR_MAX_SUBAGENT_STEPS; otherwise it is unbounded.
+        const maxSteps = subagent.info.steps ?? envOptionalPositiveInt("IMPACTR_MAX_SUBAGENT_STEPS")
 
         // Build the system context once per subagent run and reuse it across every
         // step. It does not change between steps, and a byte-stable system prefix is
@@ -171,7 +176,11 @@ const layer = Layer.effectDiscard(
         let finalOutput = ""
         let settled = false
 
-        while (!settled && currentStep <= maxSteps) {
+        while (!settled) {
+          // Terminate on the real signals — an operator-set step cap or an exhausted
+          // budget — not an arbitrary number.
+          if (maxSteps !== undefined && currentStep > maxSteps) break
+          if (yield* budget.isExhausted()) break
           const request = LLM.request({
             model,
             providerOptions: { openai: { promptCacheKey } },
@@ -245,7 +254,7 @@ const layer = Layer.effectDiscard(
           agent: spec.agent,
           model: model.id,
           steps: currentStep,
-          maxSteps,
+          maxSteps: maxSteps ?? "unbounded",
           outputChars: finalOutput.length,
           elapsedMs: (yield* Clock.currentTimeMillis) - startedAt,
         })
@@ -342,5 +351,6 @@ export const node = makeLocationNode({
     SessionStore.node,
     SessionRunnerModel.node,
     BackgroundJob.node,
+    SessionBudget.node,
   ],
 })
