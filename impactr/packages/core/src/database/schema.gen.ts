@@ -278,6 +278,7 @@ export default {
           \`novelty_score\` real NOT NULL,
           \`confidence_score\` real NOT NULL,
           \`impact_score\` real NOT NULL,
+          \`fingerprint\` text,
           \`time_created\` integer NOT NULL,
           \`time_updated\` integer NOT NULL,
           CONSTRAINT \`fk_graph_node_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
@@ -285,6 +286,9 @@ export default {
       `)
       yield* tx.run(`CREATE INDEX \`graph_node_session_idx\` ON \`graph_node\` (\`session_id\`);`)
       yield* tx.run(`CREATE INDEX \`graph_node_type_idx\` ON \`graph_node\` (\`type\`);`)
+      yield* tx.run(
+        `CREATE INDEX \`graph_node_session_fingerprint_idx\` ON \`graph_node\` (\`session_id\`,\`fingerprint\`);`,
+      )
       yield* tx.run(`
         CREATE TABLE \`graph_edge\` (
           \`source_id\` text NOT NULL,

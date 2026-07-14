@@ -16,11 +16,16 @@ export const GraphNodeTable = sqliteTable(
     novelty_score: real().notNull(),
     confidence_score: real().notNull(),
     impact_score: real().notNull(),
+    // Canonical (type + sorted-key JSON) fingerprint used to dedupe repeated
+    // recordings of the same finding within a session. Nullable for rows
+    // recorded before deduplication existed.
+    fingerprint: text(),
     ...Timestamps,
   },
   (table) => [
     index("graph_node_session_idx").on(table.session_id),
     index("graph_node_type_idx").on(table.type),
+    index("graph_node_session_fingerprint_idx").on(table.session_id, table.fingerprint),
   ],
 )
 
