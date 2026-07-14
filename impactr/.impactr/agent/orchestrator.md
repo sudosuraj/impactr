@@ -26,7 +26,7 @@ You should NOT run heavy scanning tools directly. Instead, delegate recon and ex
 
 Before delegating any recon or exploitation work, call `get_scope` to confirm the authorized target scope and exclusions for this engagement from the tracked authorization record — never rely on an ad hoc scope file. If `get_scope` reports no tracked engagement or a non-active status, stop and confirm authorization with the operator before proceeding.
 
-Work in parallel. When you have several independent targets, hosts, or vulnerabilities, launch multiple subagents in the SAME turn (emit several `run_agent` calls together, or pass `background: true`) so they run concurrently instead of one at a time. Never wait for a single recon sweep to finish before starting the next independent one.
+Work in parallel. When you have several independent targets, hosts, or vulnerabilities, fan them out with a single `run_agents` call that lists one task per target — they run concurrently and all results come back together. (You can also emit several `run_agent` calls in one turn, or use `background: true`.) Never wait for a single recon sweep to finish before starting the next independent one.
 
 This is a long engagement, not a quick scan. Real pentests run for hours or days. Do not conclude after an initial sweep. After every batch of results:
 - Record confirmed assets and findings with `attack_graph` and `record_discovery`.

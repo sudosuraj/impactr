@@ -27,6 +27,7 @@ import { SessionRunnerModel } from "../session/runner/model"
 import { BackgroundJob } from "../background-job"
 
 export const name = "run_agent"
+export const batchName = "run_agents"
 
 /**
  * Fallback ceiling on a subagent's tool-call rounds when its definition does not
@@ -36,17 +37,41 @@ export const name = "run_agent"
  */
 const MAX_SUBAGENT_STEPS = 100
 
+/**
+ * Upper bound on how many subagents `run_agents` runs at once. The whole point of
+ * the batch tool is real parallelism, but each subagent is a full LLM loop, so an
+ * unbounded fan-out would exhaust provider rate limits and local resources. Tasks
+ * beyond this run as capacity frees up.
+ */
+const MAX_PARALLEL_SUBAGENTS = 8
+
+const AgentField = Schema.String.annotate({
+  description:
+    "The subagent to run. Pentest subagents: 'recon' (enumeration/scanning only), 'attack' (exploits one assigned vulnerability). Utility subagents: 'explore' (fast search), 'general' (multi-step reasoning). Any configured subagent id is accepted.",
+})
+
+const PromptField = Schema.String.annotate({
+  description: "The specific instruction or task to delegate to the subagent.",
+})
+
 export const Input = Schema.Struct({
-  agent: Schema.String.annotate({
-    description:
-      "The subagent to run. Pentest subagents: 'recon' (enumeration/scanning only), 'attack' (exploits one assigned vulnerability). Utility subagents: 'explore' (fast search), 'general' (multi-step reasoning). Any configured subagent id is accepted.",
-  }),
-  prompt: Schema.String.annotate({
-    description: "The specific instruction or task to delegate to the subagent.",
-  }),
+  agent: AgentField,
+  prompt: PromptField,
   background: Schema.Boolean.pipe(Schema.optional).annotate({
     description:
-      "If true, the subagent runs asynchronously and this call returns immediately with a job id, letting you continue. To run several subagents at once, either emit multiple run_agent calls in a single turn (they execute concurrently) or launch them with background=true.",
+      "If true, the subagent runs asynchronously and this call returns immediately with a job id, letting you continue. To run several subagents at once, either use run_agents or launch each with background=true.",
+  }),
+})
+
+export const Task = Schema.Struct({
+  agent: AgentField,
+  prompt: PromptField,
+})
+
+export const BatchInput = Schema.Struct({
+  tasks: Schema.Array(Task).annotate({
+    description:
+      "The subagents to launch in parallel, each with its own agent and prompt. They run concurrently and every result is collected and returned together. Use this to fan work out — e.g. one 'recon' subagent per host, or several 'attack' subagents against distinct vulnerabilities — instead of delegating one at a time.",
   }),
 })
 
@@ -74,121 +99,156 @@ const layer = Layer.effectDiscard(
         concurrency: "unbounded",
       }).pipe(Effect.map(SystemContext.combine))
 
+    /** Runs one subagent to settlement and returns its final text output. */
+    const runSubagent = (spec: { readonly agent: string; readonly prompt: string }, context: Tool.Context) =>
+      Effect.gen(function* () {
+        const subagent = yield* agents.select(AgentV2.ID.make(spec.agent))
+        if (!subagent.info)
+          return yield* Effect.fail(new Error(`Unknown agent type: '${spec.agent}' is not a configured subagent`))
+        const toolMaterialization = yield* toolRegistry.materialize(subagent.info.permissions)
+        const session = yield* store.get(context.sessionID)
+        if (!session) return yield* Effect.fail(new Error("Session not found"))
+        const model = yield* models.resolve(session)
+        const maxSteps = subagent.info.steps ?? MAX_SUBAGENT_STEPS
+
+        let currentStep = 1
+        let messages: Message[] = [Message.user(spec.prompt)]
+        let finalOutput = ""
+        let settled = false
+
+        while (!settled && currentStep <= maxSteps) {
+          const systemContextCombined = yield* loadSystemContext(subagent)
+          const generation = yield* SystemContext.initialize(systemContextCombined).pipe(Effect.orDie)
+          const request = LLM.request({
+            model,
+            system: [subagent.info?.system, generation.baseline]
+              .filter((part): part is string => part !== undefined && part.length > 0)
+              .map(SystemPart.make),
+            messages,
+            tools: toolMaterialization?.definitions ?? [],
+          })
+
+          let textOutput = ""
+          const toolCalls: ToolCallPart[] = []
+          const toolResultMessages: Message[] = []
+
+          yield* llm.stream(request).pipe(
+            Stream.runForEach((event) =>
+              Effect.gen(function* () {
+                if (LLMEvent.is.textDelta(event)) {
+                  textOutput += event.text
+                }
+                if (event.type === "tool-call") {
+                  toolCalls.push(
+                    ToolCallPart.make({
+                      id: event.id,
+                      name: event.name,
+                      input: event.input,
+                    }),
+                  )
+                  const settlement = yield* toolMaterialization
+                    .settle({
+                      sessionID: context.sessionID,
+                      agent: subagent.id,
+                      assistantMessageID: context.assistantMessageID,
+                      call: event,
+                    })
+                    .pipe(
+                      Effect.catch(() =>
+                        Effect.succeed({ result: { type: "error" as const, value: "Tool execution failed" } }),
+                      ),
+                    )
+                  toolResultMessages.push(
+                    Message.tool(
+                      ToolResultPart.make({
+                        id: event.id,
+                        name: event.name,
+                        result: settlement.result,
+                      }),
+                    ),
+                  )
+                }
+              }),
+            ),
+          )
+
+          if (textOutput) finalOutput = textOutput
+          if (toolCalls.length > 0) {
+            messages = [
+              ...messages,
+              Message.make({
+                role: "assistant",
+                content: [...(textOutput ? [{ type: "text" as const, text: textOutput }] : []), ...toolCalls],
+              }),
+              ...toolResultMessages,
+            ]
+            currentStep++
+          } else {
+            finalOutput = textOutput
+            settled = true
+          }
+        }
+
+        return finalOutput
+      })
+
     yield* tools
       .register({
         [name]: Tool.make({
           description:
-            "Delegate a sub-task to a specialized subagent that executes tools inside the active workspace. Use 'recon' to enumerate/scan a target and 'attack' to exploit one identified vulnerability; use 'explore'/'general' for search and reasoning. Subagents run many tool rounds until they finish, not a fixed few. To parallelize, launch several subagents in the same turn (emit multiple run_agent calls together) or pass background=true — they execute concurrently rather than one at a time.",
+            "Delegate a sub-task to a specialized subagent that executes tools inside the active workspace. Use 'recon' to enumerate/scan a target and 'attack' to exploit one identified vulnerability; use 'explore'/'general' for search and reasoning. Subagents run many tool rounds until they finish, not a fixed few. To run several subagents at once, prefer run_agents (fans out a list in parallel and collects every result) or pass background=true.",
           input: Input,
           output: Output,
           toModelOutput: ({ output }) => [{ type: "text", text: output.output }],
           execute: (input, context) =>
             Effect.gen(function* () {
-              const subagent = yield* agents.select(AgentV2.ID.make(input.agent))
-              if (!subagent.info)
-                return yield* Effect.fail(
-                  new Error(`Unknown agent type: '${input.agent}' is not a configured subagent`),
-                )
-              const toolMaterialization = yield* toolRegistry.materialize(subagent.info.permissions)
-              const session = yield* store.get(context.sessionID)
-              if (!session) return yield* Effect.fail(new Error("Session not found"))
-              const model = yield* models.resolve(session)
-              const maxSteps = subagent.info.steps ?? MAX_SUBAGENT_STEPS
-
-              const runAgentLoop = Effect.gen(function* () {
-                let currentStep = 1
-                let messages: Message[] = [Message.user(input.prompt)]
-                let finalOutput = ""
-                let settled = false
-
-                while (!settled && currentStep <= maxSteps) {
-                  const systemContextCombined = yield* loadSystemContext(subagent)
-                  const generation = yield* SystemContext.initialize(systemContextCombined).pipe(Effect.orDie)
-                  const request = LLM.request({
-                    model,
-                    system: [subagent.info?.system, generation.baseline]
-                      .filter((part): part is string => part !== undefined && part.length > 0)
-                      .map(SystemPart.make),
-                    messages,
-                    tools: toolMaterialization?.definitions ?? [],
-                  })
-
-                  let textOutput = ""
-                  const toolCalls: ToolCallPart[] = []
-                  const toolResultMessages: Message[] = []
-
-                  yield* llm.stream(request).pipe(
-                    Stream.runForEach((event) =>
-                      Effect.gen(function* () {
-                        if (LLMEvent.is.textDelta(event)) {
-                          textOutput += event.text
-                        }
-                        if (event.type === "tool-call") {
-                          toolCalls.push(
-                            ToolCallPart.make({
-                              id: event.id,
-                              name: event.name,
-                              input: event.input,
-                            }),
-                          )
-                          const settlement = yield* toolMaterialization.settle({
-                            sessionID: context.sessionID,
-                            agent: subagent.id,
-                            assistantMessageID: context.assistantMessageID,
-                            call: event,
-                          }).pipe(
-                            Effect.catch(() =>
-                              Effect.succeed({ result: { type: "error" as const, value: "Tool execution failed" } }),
-                            ),
-                          )
-                          toolResultMessages.push(
-                            Message.tool(
-                              ToolResultPart.make({
-                                id: event.id,
-                                name: event.name,
-                                result: settlement.result,
-                              }),
-                            ),
-                          )
-                        }
-                      }),
-                    ),
-                  )
-
-                  if (textOutput) finalOutput = textOutput
-                  if (toolCalls.length > 0) {
-                    messages = [
-                      ...messages,
-                      Message.make({
-                        role: "assistant",
-                        content: [
-                          ...(textOutput ? [{ type: "text" as const, text: textOutput }] : []),
-                          ...toolCalls,
-                        ],
-                      }),
-                      ...toolResultMessages,
-                    ]
-                    currentStep++
-                  } else {
-                    finalOutput = textOutput
-                    settled = true
-                  }
-                }
-
-                return finalOutput
-              })
-
               if (input.background) {
                 const job = yield* backgroundJobs.start({
                   type: "subagent",
                   title: `Subagent: ${input.agent}`,
-                  run: runAgentLoop,
+                  run: runSubagent({ agent: input.agent, prompt: input.prompt }, context),
                 })
                 return { output: `Subagent started asynchronously with background job ID: ${job.id}` }
-              } else {
-                const finalOutput = yield* runAgentLoop
-                return { output: finalOutput }
               }
+              const finalOutput = yield* runSubagent({ agent: input.agent, prompt: input.prompt }, context)
+              return { output: finalOutput }
+            }).pipe(
+              Effect.mapError((err) => new ToolFailure({ message: err instanceof Error ? err.message : String(err) })),
+            ),
+        }),
+        [batchName]: Tool.make({
+          description:
+            "Launch several subagents in parallel and collect all of their results in one call. Pass a list of tasks, each with its own agent and prompt; they execute concurrently (up to a bounded pool) instead of one at a time, and every subagent's output — or its error — is returned together. Use this to fan work out, e.g. one 'recon' subagent per host or several 'attack' subagents against distinct vulnerabilities.",
+          input: BatchInput,
+          output: Output,
+          toModelOutput: ({ output }) => [{ type: "text", text: output.output }],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              if (input.tasks.length === 0) return { output: "No tasks provided." }
+              const results = yield* Effect.all(
+                input.tasks.map((task, index) =>
+                  runSubagent(task, context).pipe(
+                    Effect.map((output) => ({ index, agent: task.agent, output, error: undefined as string | undefined })),
+                    Effect.catch((err) =>
+                      Effect.succeed({
+                        index,
+                        agent: task.agent,
+                        output: "",
+                        error: err instanceof Error ? err.message : String(err),
+                      }),
+                    ),
+                  ),
+                ),
+                { concurrency: MAX_PARALLEL_SUBAGENTS },
+              )
+              const combined = results
+                .map((result) => {
+                  const header = `### [${result.index}] ${result.agent}`
+                  const body = result.error ? `ERROR: ${result.error}` : result.output || "(no output)"
+                  return `${header}\n${body}`
+                })
+                .join("\n\n")
+              return { output: combined }
             }).pipe(
               Effect.mapError((err) => new ToolFailure({ message: err instanceof Error ? err.message : String(err) })),
             ),
