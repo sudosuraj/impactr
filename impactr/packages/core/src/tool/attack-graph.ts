@@ -14,6 +14,9 @@ export const name = "attack_graph"
 /** A node re-added at least this many times signals the agent is looping on one asset. */
 const LOOP_THRESHOLD = 3
 
+/** Max neighbor ids listed in a get_node result before truncating. */
+const NEIGHBOR_LIMIT = 25
+
 export const description =
   "Interact with the global Attack Graph. Add nodes (targets, findings), add edges (relationships), update node status, or query the graph to understand your current pentesting state."
 
@@ -124,11 +127,17 @@ const layer = Layer.effectDiscard(
                           break
                         }
                         const neighbors = yield* graph.getNeighbors(context.sessionID, input.nodeId)
-                        summary = `Node Info:\n${JSON.stringify(node, null, 2)}\n\nNeighbors:\n${JSON.stringify(
-                          neighbors.map((n) => n.id),
-                          null,
-                          2,
-                        )}`
+                        const neighborIds = neighbors.map((n) => n.id)
+                        // Cap the neighbor list so a high-degree node can't emit
+                        // an unbounded id dump into the model context.
+                        const shownNeighbors = neighborIds.slice(0, NEIGHBOR_LIMIT)
+                        const neighborsText =
+                          neighborIds.length > NEIGHBOR_LIMIT
+                            ? `${JSON.stringify(shownNeighbors, null, 2)}\n… and ${
+                                neighborIds.length - NEIGHBOR_LIMIT
+                              } more`
+                            : JSON.stringify(shownNeighbors, null, 2)
+                        summary = `Node Info:\n${JSON.stringify(node, null, 2)}\n\nNeighbors:\n${neighborsText}`
                         break
                       }
                       case "query": {

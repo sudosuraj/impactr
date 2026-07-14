@@ -317,6 +317,9 @@ export default {
       `)
       yield* tx.run(`CREATE INDEX \`hypothesis_queue_session_idx\` ON \`hypothesis_queue\` (\`session_id\`);`)
       yield* tx.run(`CREATE INDEX \`hypothesis_queue_status_idx\` ON \`hypothesis_queue\` (\`status\`);`)
+      yield* tx.run(
+        `CREATE INDEX \`hypothesis_queue_session_status_priority_idx\` ON \`hypothesis_queue\` (\`session_id\`,\`status\`,\`priority\`);`,
+      )
       yield* tx.run(`
         CREATE TABLE \`attack_graph_node\` (
           \`session_id\` text NOT NULL,
