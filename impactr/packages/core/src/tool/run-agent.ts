@@ -28,15 +28,25 @@ import { BackgroundJob } from "../background-job"
 
 export const name = "run_agent"
 
+/**
+ * Fallback ceiling on a subagent's tool-call rounds when its definition does not
+ * pin an explicit `steps` limit. Real recon/exploitation work needs many rounds
+ * (scan → parse → pivot → re-scan), so this is deliberately high; a subagent
+ * settles earlier by simply returning text with no further tool calls.
+ */
+const MAX_SUBAGENT_STEPS = 100
+
 export const Input = Schema.Struct({
-  agent: Schema.Literals(["explore", "general"]).annotate({
-    description: "The subagent to run. 'explore' is fast and specialized in search. 'general' handles complex multi-step reasoning.",
+  agent: Schema.String.annotate({
+    description:
+      "The subagent to run. Pentest subagents: 'recon' (enumeration/scanning only), 'attack' (exploits one assigned vulnerability). Utility subagents: 'explore' (fast search), 'general' (multi-step reasoning). Any configured subagent id is accepted.",
   }),
   prompt: Schema.String.annotate({
     description: "The specific instruction or task to delegate to the subagent.",
   }),
   background: Schema.Boolean.pipe(Schema.optional).annotate({
-    description: "If true, the subagent will run asynchronously in the background, allowing you to continue immediately.",
+    description:
+      "If true, the subagent runs asynchronously and this call returns immediately with a job id, letting you continue. To run several subagents at once, either emit multiple run_agent calls in a single turn (they execute concurrently) or launch them with background=true.",
   }),
 })
 
@@ -68,17 +78,22 @@ const layer = Layer.effectDiscard(
       .register({
         [name]: Tool.make({
           description:
-            "Delegate a sub-task (like codebase search or local file editing) to a subagent. Subagents run concurrently and execute tools inside the active workspace.",
+            "Delegate a sub-task to a specialized subagent that executes tools inside the active workspace. Use 'recon' to enumerate/scan a target and 'attack' to exploit one identified vulnerability; use 'explore'/'general' for search and reasoning. Subagents run many tool rounds until they finish, not a fixed few. To parallelize, launch several subagents in the same turn (emit multiple run_agent calls together) or pass background=true — they execute concurrently rather than one at a time.",
           input: Input,
           output: Output,
           toModelOutput: ({ output }) => [{ type: "text", text: output.output }],
           execute: (input, context) =>
             Effect.gen(function* () {
               const subagent = yield* agents.select(AgentV2.ID.make(input.agent))
-              const toolMaterialization = yield* toolRegistry.materialize(subagent.info?.permissions)
+              if (!subagent.info)
+                return yield* Effect.fail(
+                  new Error(`Unknown agent type: '${input.agent}' is not a configured subagent`),
+                )
+              const toolMaterialization = yield* toolRegistry.materialize(subagent.info.permissions)
               const session = yield* store.get(context.sessionID)
               if (!session) return yield* Effect.fail(new Error("Session not found"))
               const model = yield* models.resolve(session)
+              const maxSteps = subagent.info.steps ?? MAX_SUBAGENT_STEPS
 
               const runAgentLoop = Effect.gen(function* () {
                 let currentStep = 1
@@ -86,7 +101,7 @@ const layer = Layer.effectDiscard(
                 let finalOutput = ""
                 let settled = false
 
-                while (!settled && currentStep <= 5) {
+                while (!settled && currentStep <= maxSteps) {
                   const systemContextCombined = yield* loadSystemContext(subagent)
                   const generation = yield* SystemContext.initialize(systemContextCombined).pipe(Effect.orDie)
                   const request = LLM.request({
@@ -140,6 +155,7 @@ const layer = Layer.effectDiscard(
                     ),
                   )
 
+                  if (textOutput) finalOutput = textOutput
                   if (toolCalls.length > 0) {
                     messages = [
                       ...messages,
