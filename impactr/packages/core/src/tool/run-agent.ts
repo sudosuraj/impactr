@@ -111,19 +111,32 @@ const layer = Layer.effectDiscard(
         const model = yield* models.resolve(session)
         const maxSteps = subagent.info.steps ?? MAX_SUBAGENT_STEPS
 
+        // Build the system context once per subagent run and reuse it across every
+        // step. It does not change between steps, and a byte-stable system prefix is
+        // what lets provider prompt caching hit from step 2 onward instead of
+        // re-billing the whole (growing) prompt uncached each turn.
+        const systemContextCombined = yield* loadSystemContext(subagent)
+        const generation = yield* SystemContext.initialize(systemContextCombined).pipe(Effect.orDie)
+        const system = [subagent.info?.system, generation.baseline]
+          .filter((part): part is string => part !== undefined && part.length > 0)
+          .map(SystemPart.make)
+        // Stable per-run cache key (mirrors the main runner) so the cached prefix is
+        // reused across this subagent's steps.
+        const baseCacheKey = /^ses_[0-9a-f]{64}$/.test(context.sessionID)
+          ? context.sessionID.slice(4)
+          : context.sessionID
+        const promptCacheKey = `${baseCacheKey}:${subagent.id}`
+
         let currentStep = 1
         let messages: Message[] = [Message.user(spec.prompt)]
         let finalOutput = ""
         let settled = false
 
         while (!settled && currentStep <= maxSteps) {
-          const systemContextCombined = yield* loadSystemContext(subagent)
-          const generation = yield* SystemContext.initialize(systemContextCombined).pipe(Effect.orDie)
           const request = LLM.request({
             model,
-            system: [subagent.info?.system, generation.baseline]
-              .filter((part): part is string => part !== undefined && part.length > 0)
-              .map(SystemPart.make),
+            providerOptions: { openai: { promptCacheKey } },
+            system,
             messages,
             tools: toolMaterialization?.definitions ?? [],
           })
