@@ -1,7 +1,7 @@
 import { createAsync } from "@solidjs/router"
 import { createSignal, For, Show } from "solid-js"
 import { AppShell } from "~/components/layout/app-shell"
-import { PageHeader } from "~/components/ui/page-header"
+import { Page } from "~/components/ui/page"
 import { Card, CardHeader } from "~/components/ui/card"
 import { Tabs } from "~/components/ui/tabs"
 import { Badge } from "~/components/ui/badge"
@@ -26,8 +26,7 @@ export default function Settings() {
 
   return (
     <AppShell>
-      <PageHeader title="Settings" description="Your account, organization, and team" />
-      <div class="p-8">
+      <Page title="Settings" description="Your account, organization, and team">
         <Tabs
           active={section()}
           onChange={(value) => setSection(value as Section)}
@@ -113,7 +112,7 @@ export default function Settings() {
             </Card>
           </Show>
         </div>
-      </div>
+      </Page>
     </AppShell>
   )
 }

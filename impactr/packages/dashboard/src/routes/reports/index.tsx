@@ -1,5 +1,5 @@
 import { AppShell } from "~/components/layout/app-shell"
-import { PageHeader } from "~/components/ui/page-header"
+import { Page } from "~/components/ui/page"
 import { Card } from "~/components/ui/card"
 import { EmptyState } from "~/components/ui/empty-state"
 import { IconReports } from "~/components/layout/icons"
@@ -7,8 +7,7 @@ import { IconReports } from "~/components/layout/icons"
 export default function Reports() {
   return (
     <AppShell>
-      <PageHeader title="Reports" description="Export and share findings from your engagements" />
-      <div class="p-8">
+      <Page title="Reports" description="Export and share findings from your engagements">
         <Card>
           <EmptyState
             icon={<IconReports />}
@@ -16,7 +15,7 @@ export default function Reports() {
             description="Downloadable engagement reports are coming soon. In the meantime, your findings and asset data are always available on their own pages."
           />
         </Card>
-      </div>
+      </Page>
     </AppShell>
   )
 }
