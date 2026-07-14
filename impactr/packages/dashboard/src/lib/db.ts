@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/libsql"
 import { FindingTable } from "@impactr-ai/core/finding/hosted-sql"
 import { AsmAssetTable } from "@impactr-ai/core/asm-asset/hosted-sql"
-import { EngagementTable } from "@impactr-ai/core/engagement/hosted-sql"
+import { EngagementTable, EngagementAuditLogTable } from "@impactr-ai/core/engagement/hosted-sql"
 import { OrganizationTable, UserTable, MembershipTable } from "@impactr-ai/core/organization/hosted-sql"
 import { HostedAttackGraphNodeTable, HostedAttackGraphEdgeTable } from "@impactr-ai/core/database/hosted/pentest-sql"
 
@@ -9,6 +9,7 @@ const schema = {
   FindingTable,
   AsmAssetTable,
   EngagementTable,
+  EngagementAuditLogTable,
   OrganizationTable,
   UserTable,
   MembershipTable,
@@ -28,6 +29,7 @@ export {
   FindingTable,
   AsmAssetTable,
   EngagementTable,
+  EngagementAuditLogTable,
   OrganizationTable,
   UserTable,
   MembershipTable,

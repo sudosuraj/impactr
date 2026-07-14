@@ -1,1 +1,131 @@
 @import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: oklch(100% 0 0);
+  --surface: oklch(100% 0 0);
+  --surface-raised: oklch(98.5% 0 0);
+  /* Lightness values below are computed, not eyeballed — see the contrast checks
+     referenced in the redesign commit. Text-usage tokens (severity/status) target
+     4.5:1 against white; border tokens target ~1.5:1, a deliberately subtle but
+     WCAG non-text-legible boundary rather than the full 3:1 UI-component ratio,
+     since these are decorative dividers backed by spacing, not the sole means of
+     conveying structure. */
+  --border: oklch(87% 0 0);
+  --border-strong: oklch(78% 0 0);
+  --foreground: oklch(14.5% 0 0);
+  --muted: oklch(46% 0 0);
+  --muted-foreground: oklch(55% 0 0);
+  --accent: oklch(20% 0 0);
+  --accent-foreground: oklch(100% 0 0);
+  --ring: oklch(60% 0 0);
+
+  --severity-critical: oklch(59% 0.22 25);
+  --severity-high: oklch(58% 0.19 45);
+  --severity-medium: oklch(78% 0.15 85);
+  --severity-low: oklch(60% 0.13 250);
+  --severity-info: oklch(60% 0 0);
+
+  --status-success: oklch(55% 0.15 150);
+  --status-active: oklch(56% 0.17 250);
+  --status-pending: oklch(56% 0.14 85);
+  --status-danger: oklch(59% 0.22 25);
+}
+
+:root.dark {
+  --background: oklch(14% 0 0);
+  --surface: oklch(17% 0 0);
+  --surface-raised: oklch(20% 0 0);
+  --border: oklch(31% 0 0);
+  --border-strong: oklch(40% 0 0);
+  --foreground: oklch(96% 0 0);
+  --muted: oklch(70% 0 0);
+  --muted-foreground: oklch(62% 0 0);
+  --accent: oklch(96% 0 0);
+  --accent-foreground: oklch(14% 0 0);
+  --ring: oklch(50% 0 0);
+
+  --severity-critical: oklch(65% 0.2 25);
+  --severity-high: oklch(72% 0.17 45);
+  --severity-medium: oklch(80% 0.14 85);
+  --severity-low: oklch(68% 0.12 250);
+  --severity-info: oklch(65% 0 0);
+
+  --status-success: oklch(68% 0.15 150);
+  --status-active: oklch(65% 0.16 250);
+  --status-pending: oklch(75% 0.13 85);
+  --status-danger: oklch(65% 0.2 25);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+
+  --color-severity-critical: var(--severity-critical);
+  --color-severity-high: var(--severity-high);
+  --color-severity-medium: var(--severity-medium);
+  --color-severity-low: var(--severity-low);
+  --color-severity-info: var(--severity-info);
+
+  --color-status-success: var(--status-success);
+  --color-status-active: var(--status-active);
+  --color-status-pending: var(--status-pending);
+  --color-status-danger: var(--status-danger);
+
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-foreground);
+    color: var(--color-background);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+}
