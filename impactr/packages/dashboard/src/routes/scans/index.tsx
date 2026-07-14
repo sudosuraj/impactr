@@ -1,7 +1,7 @@
 import { A, createAsync } from "@solidjs/router"
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { AppShell } from "~/components/layout/app-shell"
-import { PageHeader } from "~/components/ui/page-header"
+import { Page, CountPill } from "~/components/ui/page"
 import { Tabs } from "~/components/ui/tabs"
 import { StatusBadge, type EngagementStatusTone } from "~/components/ui/badge"
 import { EmptyState } from "~/components/ui/empty-state"
@@ -42,8 +42,11 @@ export default function Scans() {
 
   return (
     <AppShell>
-      <PageHeader title="Scans" description="Engagement activity started and tracked by your Impactr team" />
-      <div class="p-8">
+      <Page
+        title="Scans"
+        description="Engagement activity started and tracked by your Impactr team"
+        actions={<Show when={engagements()}>{(list) => <CountPill>{list().length} engagements</CountPill>}</Show>}
+      >
         <Tabs
           active={tab()}
           onChange={(value) => setTab(value as Bucket)}
@@ -86,7 +89,7 @@ export default function Scans() {
             </Show>
           </Show>
         </div>
-      </div>
+      </Page>
     </AppShell>
   )
 }

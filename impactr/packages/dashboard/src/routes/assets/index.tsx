@@ -1,7 +1,7 @@
 import { createAsync } from "@solidjs/router"
 import { createSignal, For, Show } from "solid-js"
 import { AppShell } from "~/components/layout/app-shell"
-import { PageHeader } from "~/components/ui/page-header"
+import { Page, CountPill } from "~/components/ui/page"
 import { SearchInput } from "~/components/ui/input"
 import { Select } from "~/components/ui/select"
 import { Table, type Column } from "~/components/ui/table"
@@ -39,8 +39,11 @@ export default function Assets() {
 
   return (
     <AppShell>
-      <PageHeader title="Assets" description="Discovered attack surface for your engagements" />
-      <div class="p-8">
+      <Page
+        title="Assets"
+        description="Discovered attack surface for your engagements"
+        actions={<Show when={assets()}>{(list) => <CountPill>{list().length} assets</CountPill>}</Show>}
+      >
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div class="flex-1">
             <SearchInput
@@ -73,7 +76,7 @@ export default function Assets() {
             )}
           </Show>
         </div>
-      </div>
+      </Page>
 
       <Drawer open={selected() !== null} onClose={() => setSelected(null)} title="Asset Details">
         <Show when={selected()}>

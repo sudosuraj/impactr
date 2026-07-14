@@ -1,151 +1,140 @@
-import { A, createAsync } from "@solidjs/router"
-import { For, Show } from "solid-js"
+import { createAsync } from "@solidjs/router"
+import { Show } from "solid-js"
 import { AppShell } from "~/components/layout/app-shell"
-import { PageHeader } from "~/components/ui/page-header"
-import { StatCard } from "~/components/ui/stat-card"
 import { Card, CardHeader } from "~/components/ui/card"
-import { SeverityBadge } from "~/components/ui/badge"
-import { Timeline, type TimelineItem } from "~/components/ui/timeline"
-import { EmptyState } from "~/components/ui/empty-state"
 import { SkeletonCard } from "~/components/ui/skeleton"
-import { Button } from "~/components/ui/button"
-import { IconAssets, IconFindings, IconReports, IconScans } from "~/components/layout/icons"
-import { getDashboard } from "~/lib/data"
-
-const AUDIT_LABEL: Record<string, string> = {
-  created: "Engagement created",
-  authorized: "Engagement authorized",
-  scope_changed: "Scope updated",
-  revoked: "Engagement revoked",
-  reactivated: "Engagement reactivated",
-}
-
-function timeAgo(ms: number): string {
-  const diff = Date.now() - ms
-  const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return "just now"
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
+import { KpiTile } from "~/components/dashboard/kpi-tile"
+import { DiscoveryChart } from "~/components/dashboard/discovery-chart"
+import { ExposureRing } from "~/components/dashboard/exposure-ring"
+import { IntrusionChains } from "~/components/dashboard/intrusion-chains"
+import { WorkingLeads } from "~/components/dashboard/working-leads"
+import { SurfaceTerrain } from "~/components/dashboard/surface-terrain"
+import { AttackGraphMap } from "~/components/dashboard/attack-graph-map"
+import { getCommandCenter } from "~/lib/command-center"
 
 export default function Dashboard() {
-  const stats = createAsync(() => getDashboard())
-
-  const activityItems = (): TimelineItem[] =>
-    (stats()?.recentActivity ?? []).map((entry) => ({
-      id: entry.id,
-      title: AUDIT_LABEL[entry.action] ?? entry.action,
-      time: timeAgo(entry.time_created),
-      tone: entry.action === "revoked" ? "danger" : entry.action === "authorized" ? "success" : "neutral",
-    }))
+  const data = createAsync(() => getCommandCenter())
 
   return (
     <AppShell>
-      <PageHeader title="Dashboard" description="Overview of your security posture" />
-      <div class="space-y-6 p-8">
+      <div class="mx-auto max-w-[1200px] px-6 py-7">
+        <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 class="text-xl font-semibold tracking-tight text-foreground">Overview</h1>
+            <p class="mt-1 text-sm text-muted">Authorized engagement · continuous discovery engine</p>
+          </div>
+          <Show when={data()}>
+            {(d) => (
+              <span class="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-[12.5px] text-muted">
+                <span class="relative flex h-[7px] w-[7px]">
+                  <span
+                    class={`h-[7px] w-[7px] rounded-full ${d().discovery.current > 0 ? "bg-brand agent-pulse" : "bg-muted-foreground"}`}
+                  />
+                </span>
+                <Show when={d().discovery.current > 0} fallback={<span>Agent idle</span>}>
+                  <span>
+                    Agent <span class="font-semibold text-foreground">active</span>
+                  </span>
+                </Show>
+                · tracking <span class="font-semibold text-foreground tnum">{d().kpis.surface}</span> assets
+              </span>
+            )}
+          </Show>
+        </div>
+
         <Show
-          when={stats()}
+          when={data()}
           fallback={
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
+            <div class="space-y-4">
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </div>
               <SkeletonCard />
             </div>
           }
         >
-          {(data) => (
-            <>
+          {(d) => (
+            <div class="space-y-4">
               <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard
-                  label="Security Score"
-                  value={data().securityScore}
-                  tone={data().securityScore >= 80 ? "success" : data().securityScore < 50 ? "danger" : "neutral"}
-                  hint="Based on unresolved findings"
+                <KpiTile
+                  label="Surface surveilled"
+                  value={d().kpis.surface}
+                  sub="assets tracked this engagement"
+                  delta={d().kpis.surfaceNew > 0 ? `+${d().kpis.surfaceNew}` : undefined}
                 />
-                <StatCard label="Active Assets" value={data().activeAssetsCount} icon={<IconAssets />} />
-                <StatCard label="Running Scans" value={data().runningScansCount} icon={<IconScans />} />
-                <StatCard
-                  label="Critical Findings"
-                  value={data().criticalFindingsCount}
-                  tone={data().criticalFindingsCount > 0 ? "danger" : "neutral"}
-                  icon={<IconFindings />}
+                <KpiTile
+                  label="Footholds held"
+                  value={d().kpis.footholds}
+                  tone={d().kpis.footholds > 0 ? "critical" : "neutral"}
+                  sub="compromised nodes in the graph"
                 />
+                <KpiTile
+                  label="Exposure index"
+                  value={d().kpis.exposure}
+                  tone={d().kpis.exposure >= 30 ? "critical" : "neutral"}
+                  sub={`${d().exposure.critical} critical · ${d().exposure.high} high open`}
+                />
+                <KpiTile label="Active leads" value={d().kpis.leads} sub="queued by potential score" />
               </div>
 
-              <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
                 <Card>
-                  <CardHeader title="Recent Activity" description="Latest engagement events" />
+                  <CardHeader title="Discovery rate" description="New intel per hour, trending toward saturation" />
                   <div class="p-5">
-                    <Show
-                      when={activityItems().length > 0}
-                      fallback={<EmptyState title="No activity yet" description="Engagement events will show up here." />}
-                    >
-                      <Timeline items={activityItems()} />
-                    </Show>
+                    <DiscoveryChart
+                      series={d().discovery.series}
+                      peak={d().discovery.peak}
+                      current={d().discovery.current}
+                      saturationPct={d().discovery.saturationPct}
+                      spanHours={d().discovery.spanHours}
+                    />
                   </div>
                 </Card>
-
                 <Card>
-                  <CardHeader
-                    title="Recent Findings"
-                    description="Latest discoveries"
-                    action={
-                      <A href="/findings" class="text-sm text-muted-foreground hover:text-foreground">
-                        View all
-                      </A>
-                    }
-                  />
-                  <Show
-                    when={data().recentFindings.length > 0}
-                    fallback={<EmptyState title="No findings yet" description="Findings will appear here as they're discovered." />}
-                  >
-                    <ul>
-                      <For each={data().recentFindings}>
-                        {(finding) => (
-                          <li class="border-b border-border px-5 py-3 last:border-0">
-                            <A href={`/findings/${finding.id}`} class="flex items-center justify-between gap-3">
-                              <span class="truncate text-sm text-foreground">{finding.title}</span>
-                              <SeverityBadge severity={finding.severity} />
-                            </A>
-                          </li>
-                        )}
-                      </For>
-                    </ul>
-                  </Show>
+                  <CardHeader title="Exposure" description="Weighted by unresolved findings" />
+                  <div class="p-3">
+                    <ExposureRing
+                      index={d().exposure.index}
+                      critical={d().exposure.critical}
+                      high={d().exposure.high}
+                      medium={d().exposure.medium}
+                    />
+                  </div>
                 </Card>
               </div>
-            </>
+
+              <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
+                <Card>
+                  <CardHeader title="Intrusion chains" description="Foothold → pivot → impact, assembled by the agent" />
+                  <IntrusionChains chains={d().chains} />
+                </Card>
+                <Card>
+                  <CardHeader title="Working leads" description="What the agent will chase next" />
+                  <WorkingLeads leads={d().leads} />
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader
+                  title="Attack graph"
+                  description="Assets and the relationships the agent has drawn between them"
+                />
+                <AttackGraphMap nodes={d().graph.nodes} edges={d().graph.edges} />
+              </Card>
+
+              <Card>
+                <CardHeader
+                  title="Surface terrain"
+                  description="Each cell is one asset, shaded by how deep the agent has gone"
+                />
+                <SurfaceTerrain terrain={d().terrain} />
+              </Card>
+            </div>
           )}
         </Show>
-
-        <Card>
-          <CardHeader title="Quick Actions" />
-          <div class="flex flex-wrap gap-3 p-5">
-            <A href="/assets">
-              <Button variant="secondary">
-                <IconAssets class="h-4 w-4" /> View Assets
-              </Button>
-            </A>
-            <A href="/scans">
-              <Button variant="secondary">
-                <IconScans class="h-4 w-4" /> View Scans
-              </Button>
-            </A>
-            <A href="/findings">
-              <Button variant="secondary">
-                <IconFindings class="h-4 w-4" /> Review Findings
-              </Button>
-            </A>
-            <A href="/reports">
-              <Button variant="secondary">
-                <IconReports class="h-4 w-4" /> Generate Report
-              </Button>
-            </A>
-          </div>
-        </Card>
       </div>
     </AppShell>
   )

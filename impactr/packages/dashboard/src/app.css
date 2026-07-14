@@ -2,60 +2,70 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+  Impactr dashboard design system — "warm graphite + emerald".
+  Neutrals carry a small warm hue bias (chroma ~0.004–0.006, hue ~60–70) so they
+  read as chosen graphite, never a cold blue-grey. Emerald is the single brand
+  accent, used only for agent-active / brand / positive states. Severity keeps its
+  own semantic heat scale (red → orange → amber → lime) independent of the accent.
+  Token names are kept stable so existing components adopt the palette unchanged.
+*/
 :root {
-  --background: oklch(100% 0 0);
+  --background: oklch(98.5% 0.003 70);
   --surface: oklch(100% 0 0);
-  --surface-raised: oklch(98.5% 0 0);
-  /* Lightness values below are computed, not eyeballed — see the contrast checks
-     referenced in the redesign commit. Text-usage tokens (severity/status) target
-     4.5:1 against white; border tokens target ~1.5:1, a deliberately subtle but
-     WCAG non-text-legible boundary rather than the full 3:1 UI-component ratio,
-     since these are decorative dividers backed by spacing, not the sole means of
-     conveying structure. */
-  --border: oklch(87% 0 0);
-  --border-strong: oklch(78% 0 0);
-  --foreground: oklch(14.5% 0 0);
-  --muted: oklch(46% 0 0);
-  --muted-foreground: oklch(55% 0 0);
-  --accent: oklch(20% 0 0);
-  --accent-foreground: oklch(100% 0 0);
-  --ring: oklch(60% 0 0);
+  --surface-raised: oklch(97.4% 0.004 70);
+  --border: oklch(92% 0.004 70);
+  --border-strong: oklch(86.5% 0.005 70);
+  --foreground: oklch(22% 0.006 55);
+  --muted: oklch(50% 0.006 55);
+  --muted-foreground: oklch(57% 0.006 55);
+  --accent: oklch(22% 0.006 55);
+  --accent-foreground: oklch(99% 0 0);
+  --ring: oklch(60% 0.09 162);
 
-  --severity-critical: oklch(59% 0.22 25);
-  --severity-high: oklch(58% 0.19 45);
-  --severity-medium: oklch(78% 0.15 85);
-  --severity-low: oklch(60% 0.13 250);
-  --severity-info: oklch(60% 0 0);
+  --brand: oklch(56% 0.115 162);
+  --brand-strong: oklch(50% 0.12 162);
+  --brand-foreground: oklch(99% 0 0);
 
-  --status-success: oklch(55% 0.15 150);
-  --status-active: oklch(56% 0.17 250);
-  --status-pending: oklch(56% 0.14 85);
-  --status-danger: oklch(59% 0.22 25);
+  --severity-critical: oklch(57% 0.205 27);
+  --severity-high: oklch(63% 0.17 47);
+  --severity-medium: oklch(72% 0.145 78);
+  --severity-low: oklch(68% 0.15 135);
+  --severity-info: oklch(60% 0.006 55);
+
+  --status-success: oklch(56% 0.115 162);
+  --status-active: oklch(56% 0.115 162);
+  --status-pending: oklch(66% 0.135 78);
+  --status-danger: oklch(57% 0.205 27);
 }
 
 :root.dark {
-  --background: oklch(14% 0 0);
-  --surface: oklch(17% 0 0);
-  --surface-raised: oklch(20% 0 0);
-  --border: oklch(31% 0 0);
-  --border-strong: oklch(40% 0 0);
-  --foreground: oklch(96% 0 0);
-  --muted: oklch(70% 0 0);
-  --muted-foreground: oklch(62% 0 0);
-  --accent: oklch(96% 0 0);
-  --accent-foreground: oklch(14% 0 0);
-  --ring: oklch(50% 0 0);
+  --background: oklch(18% 0.004 55);
+  --surface: oklch(21% 0.004 55);
+  --surface-raised: oklch(24% 0.005 55);
+  --border: oklch(30% 0.005 55);
+  --border-strong: oklch(38% 0.006 55);
+  --foreground: oklch(97% 0.003 70);
+  --muted: oklch(72% 0.006 55);
+  --muted-foreground: oklch(63% 0.006 55);
+  --accent: oklch(97% 0.003 70);
+  --accent-foreground: oklch(20% 0.005 55);
+  --ring: oklch(58% 0.1 162);
 
-  --severity-critical: oklch(65% 0.2 25);
-  --severity-high: oklch(72% 0.17 45);
-  --severity-medium: oklch(80% 0.14 85);
-  --severity-low: oklch(68% 0.12 250);
-  --severity-info: oklch(65% 0 0);
+  --brand: oklch(72% 0.145 163);
+  --brand-strong: oklch(66% 0.15 163);
+  --brand-foreground: oklch(16% 0.02 160);
 
-  --status-success: oklch(68% 0.15 150);
-  --status-active: oklch(65% 0.16 250);
-  --status-pending: oklch(75% 0.13 85);
-  --status-danger: oklch(65% 0.2 25);
+  --severity-critical: oklch(66% 0.19 27);
+  --severity-high: oklch(72% 0.16 47);
+  --severity-medium: oklch(80% 0.14 82);
+  --severity-low: oklch(78% 0.16 138);
+  --severity-info: oklch(66% 0.006 55);
+
+  --status-success: oklch(72% 0.145 163);
+  --status-active: oklch(72% 0.145 163);
+  --status-pending: oklch(76% 0.13 82);
+  --status-danger: oklch(66% 0.19 27);
 }
 
 @theme inline {
@@ -71,6 +81,10 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-ring: var(--ring);
 
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-foreground: var(--brand-foreground);
+
   --color-severity-critical: var(--severity-critical);
   --color-severity-high: var(--severity-high);
   --color-severity-medium: var(--severity-medium);
@@ -82,8 +96,8 @@
   --color-status-pending: var(--status-pending);
   --color-status-danger: var(--status-danger);
 
-  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
 }
 
 @layer base {
@@ -103,13 +117,14 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
   ::selection {
-    background-color: var(--color-foreground);
-    color: var(--color-background);
+    background-color: color-mix(in srgb, var(--color-brand) 26%, transparent);
+    color: var(--color-foreground);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -127,5 +142,25 @@
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Agent-active pulse — a single restrained ring, not a neon glow. */
+  .agent-pulse::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    border: 1px solid var(--color-brand);
+    opacity: 0.4;
+    animation: agent-ring 2.6s ease-out infinite;
+  }
+  @keyframes agent-ring {
+    0% { transform: scale(0.6); opacity: 0.5; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .agent-pulse::after { animation: none; }
   }
 }
