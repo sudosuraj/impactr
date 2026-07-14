@@ -192,5 +192,7 @@ export const HypothesisQueueTable = sqliteTable(
   (table) => [
     index("hypothesis_queue_session_idx").on(table.session_id),
     index("hypothesis_queue_status_idx").on(table.status),
+    // Serves popHighestPriority: WHERE session_id = ? AND status = ? ORDER BY priority DESC.
+    index("hypothesis_queue_session_status_priority_idx").on(table.session_id, table.status, table.priority),
   ],
 )

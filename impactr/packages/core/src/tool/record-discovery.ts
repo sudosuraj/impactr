@@ -12,6 +12,9 @@ import { PermissionV2 } from "../permission"
 
 export const name = "record_discovery"
 
+/** Clamp a model-supplied score into [0,1] so a malformed value can't distort the potential ranking. */
+const clamp01 = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0)
+
 export const description = `Use this tool to manually record a meaningful finding into the Knowledge Graph during your continuous discovery process. 
 A finding can be a subdomain, an endpoint, a vulnerability, a technology fingerprint, or any other valuable piece of intelligence. 
 You must score the finding to help prioritize future exploration.`
@@ -64,9 +67,9 @@ const layer = Layer.effectDiscard(
                   graph.addFinding(context.sessionID, {
                     type: input.type,
                     data: input.data,
-                    noveltyScore: input.noveltyScore,
-                    confidenceScore: input.confidenceScore,
-                    impactScore: input.impactScore,
+                    noveltyScore: clamp01(input.noveltyScore),
+                    confidenceScore: clamp01(input.confidenceScore),
+                    impactScore: clamp01(input.impactScore),
                   }).pipe(Effect.orDie)
                 ),
                 Effect.tap(() => saturation.recordFinding(context.sessionID).pipe(Effect.orDie)),
