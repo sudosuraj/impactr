@@ -29,8 +29,12 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const state = yield* Ref.make({
       config: {
-        windowDuration: Duration.hours(1),
-        minMeaningfulFindings: 10,
+        // Real engagements run for days with long low-yield stretches (fuzzing,
+        // slow scans, deep exploitation). Only declare saturation after a genuinely
+        // long dry spell so the Continuous Discovery Engine keeps working instead
+        // of quitting after the first quiet hour.
+        windowDuration: Duration.hours(2),
+        minMeaningfulFindings: 2,
       } as SaturationConfig,
       sessions: new Map<string, SessionState>(),
     })
