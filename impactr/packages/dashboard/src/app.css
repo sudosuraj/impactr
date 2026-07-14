@@ -33,8 +33,8 @@
   --severity-low: oklch(68% 0.15 135);
   --severity-info: oklch(60% 0.006 55);
 
-  --status-success: oklch(56% 0.115 162);
-  --status-active: oklch(56% 0.115 162);
+  --status-success: oklch(52% 0.1 150);
+  --status-active: oklch(58% 0.14 162);
   --status-pending: oklch(66% 0.135 78);
   --status-danger: oklch(57% 0.205 27);
 }
@@ -62,8 +62,8 @@
   --severity-low: oklch(78% 0.16 138);
   --severity-info: oklch(66% 0.006 55);
 
-  --status-success: oklch(72% 0.145 163);
-  --status-active: oklch(72% 0.145 163);
+  --status-success: oklch(70% 0.12 150);
+  --status-active: oklch(74% 0.15 163);
   --status-pending: oklch(76% 0.13 82);
   --status-danger: oklch(66% 0.19 27);
 }
