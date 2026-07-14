@@ -9,6 +9,7 @@ import {
   ToolCallPart,
   ToolResultPart,
   ToolFailure,
+  type ToolCall,
 } from "@impactr-ai/llm"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { makeLocationNode } from "../effect/app-node"
@@ -44,6 +45,13 @@ const MAX_SUBAGENT_STEPS = 100
  * beyond this run as capacity frees up.
  */
 const MAX_PARALLEL_SUBAGENTS = 8
+
+/**
+ * Upper bound on how many of a single turn's tool calls settle at once. Models
+ * usually emit only a few, but bounding avoids spawning an unbounded number of
+ * heavy scan processes when one does emit many.
+ */
+const MAX_PARALLEL_TOOL_CALLS = 8
 
 const AgentField = Schema.String.annotate({
   description:
@@ -108,7 +116,12 @@ const layer = Layer.effectDiscard(
         const toolMaterialization = yield* toolRegistry.materialize(subagent.info.permissions)
         const session = yield* store.get(context.sessionID)
         if (!session) return yield* Effect.fail(new Error("Session not found"))
-        const model = yield* models.resolve(session)
+        // Model tiering: honor the subagent's own configured model when set, so the
+        // high-volume/low-reasoning agents (recon, explore) can run on a cheaper,
+        // faster model than the orchestrator's, instead of always inheriting it.
+        const model = yield* models.resolve(
+          subagent.info.model ? { ...session, model: subagent.info.model } : session,
+        )
         const maxSteps = subagent.info.steps ?? MAX_SUBAGENT_STEPS
 
         // Build the system context once per subagent run and reuse it across every
@@ -142,51 +155,49 @@ const layer = Layer.effectDiscard(
           })
 
           let textOutput = ""
-          const toolCalls: ToolCallPart[] = []
-          const toolResultMessages: Message[] = []
+          const calls: ToolCall[] = []
 
+          // Collect this turn's output; defer tool settlement until the stream
+          // completes so the calls can be settled concurrently below.
           yield* llm.stream(request).pipe(
             Stream.runForEach((event) =>
-              Effect.gen(function* () {
+              Effect.sync(() => {
                 if (LLMEvent.is.textDelta(event)) {
                   textOutput += event.text
+                  return
                 }
-                if (event.type === "tool-call") {
-                  toolCalls.push(
-                    ToolCallPart.make({
-                      id: event.id,
-                      name: event.name,
-                      input: event.input,
-                    }),
-                  )
-                  const settlement = yield* toolMaterialization
-                    .settle({
-                      sessionID: context.sessionID,
-                      agent: subagent.id,
-                      assistantMessageID: context.assistantMessageID,
-                      call: event,
-                    })
-                    .pipe(
-                      Effect.catch(() =>
-                        Effect.succeed({ result: { type: "error" as const, value: "Tool execution failed" } }),
-                      ),
-                    )
-                  toolResultMessages.push(
-                    Message.tool(
-                      ToolResultPart.make({
-                        id: event.id,
-                        name: event.name,
-                        result: settlement.result,
-                      }),
-                    ),
-                  )
-                }
+                if (event.type === "tool-call") calls.push(event)
               }),
             ),
           )
 
           if (textOutput) finalOutput = textOutput
-          if (toolCalls.length > 0) {
+          if (calls.length > 0) {
+            const toolCalls = calls.map((call) =>
+              ToolCallPart.make({ id: call.id, name: call.name, input: call.input }),
+            )
+            // Settle a turn's tool calls in parallel instead of one at a time: a recon
+            // step that fires several scans no longer runs them serially.
+            const toolResultMessages = yield* Effect.all(
+              calls.map((call) =>
+                toolMaterialization
+                  .settle({
+                    sessionID: context.sessionID,
+                    agent: subagent.id,
+                    assistantMessageID: context.assistantMessageID,
+                    call,
+                  })
+                  .pipe(
+                    Effect.catch(() =>
+                      Effect.succeed({ result: { type: "error" as const, value: "Tool execution failed" } }),
+                    ),
+                    Effect.map((settlement) =>
+                      Message.tool(ToolResultPart.make({ id: call.id, name: call.name, result: settlement.result })),
+                    ),
+                  ),
+              ),
+              { concurrency: MAX_PARALLEL_TOOL_CALLS },
+            )
             messages = [
               ...messages,
               Message.make({
