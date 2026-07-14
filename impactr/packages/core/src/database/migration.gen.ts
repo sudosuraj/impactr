@@ -44,5 +44,6 @@ export const migrations = (
     import("./migration/20260713000000_add_pentest_tables"),
     import("./migration/20260714000000_dedupe_graph_node"),
     import("./migration/20260714010000_hypothesis_queue_priority_index"),
+    import("./migration/20260714110000_add_session_engagement_id"),
   ])
 ).map((module) => module.default) satisfies DatabaseMigration.Migration[]

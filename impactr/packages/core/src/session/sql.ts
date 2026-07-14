@@ -8,6 +8,7 @@ import type { Snapshot } from "../snapshot"
 import { PermissionV1 } from "../v1/permission"
 import { ProjectV2 } from "../project"
 import type { SessionSchema } from "./schema"
+import type { EngagementSchema } from "../engagement/schema"
 import type { MessageID, PartID, SessionV1 } from "../v1/session"
 import { WorkspaceV2 } from "../workspace"
 import { Timestamps } from "../database/schema.sql"
@@ -28,6 +29,9 @@ export const SessionTable = sqliteTable(
       .notNull()
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
     workspace_id: text().$type<WorkspaceV2.ID>(),
+    // Not a SQL foreign key: engagement lives in the separate hosted database (see
+    // database/hosted-database.ts). Null for pure local/offline sessions.
+    engagement_id: text().$type<EngagementSchema.ID>(),
     parent_id: text().$type<SessionSchema.ID>(),
     slug: text().notNull(),
     directory: DatabasePath.directoryColumn().notNull(),

@@ -1,12 +1,14 @@
 export * as AttackGraphTool from "./attack-graph"
 
 import { ToolFailure } from "@impactr-ai/llm"
-import { Effect, Layer, Schema } from "effect"
+import { Effect, Layer, Option, Schema } from "effect"
 import { makeLocationNode } from "../effect/app-node"
 import { ToolRegistry } from "./registry"
 import { Tool } from "./tool"
 import { Tools } from "./tools"
 import { AttackGraph, node as AttackGraphNode, NodeType, NodeStatus, EdgeRelation } from "../attack-graph/graph"
+import { HostedContext, node as HostedContextNode } from "../session/hosted-context"
+import { HostedAttackGraph } from "../database/hosted/attack-graph"
 import { PermissionV2 } from "../permission"
 
 export const name = "attack_graph"
@@ -48,6 +50,7 @@ const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const tools = yield* Tools.Service
     const graph = yield* AttackGraph
+    const hostedContext = yield* HostedContext.Service
     const permission = yield* PermissionV2.Service
 
     yield* tools
@@ -70,6 +73,35 @@ const layer = Layer.effectDiscard(
                 Effect.mapError(() => new ToolFailure({ message: "Permission denied: attack_graph" })),
                 Effect.andThen(
                   Effect.gen(function* () {
+                    // A session with an engagement scoped to a configured hosted DB writes
+                    // to the shared per-engagement graph; otherwise the local, per-session
+                    // graph behaves exactly as before.
+                    const hosted = yield* hostedContext.resolve(context.sessionID as any)
+                    const addNode = (node: Parameters<typeof graph.addNode>[1]) =>
+                      Option.isSome(hosted)
+                        ? HostedAttackGraph.addNode(hosted.value.db, hosted.value.engagementID, context.sessionID as any, node)
+                        : graph.addNode(context.sessionID, node)
+                    const updateNodeStatus = (id: string, status: NodeStatus) =>
+                      Option.isSome(hosted)
+                        ? HostedAttackGraph.updateNodeStatus(hosted.value.db, hosted.value.engagementID, id, status)
+                        : graph.updateNodeStatus(context.sessionID, id, status)
+                    const addEdge = (edge: Parameters<typeof graph.addEdge>[1]) =>
+                      Option.isSome(hosted)
+                        ? HostedAttackGraph.addEdge(hosted.value.db, hosted.value.engagementID, context.sessionID as any, edge)
+                        : graph.addEdge(context.sessionID, edge)
+                    const getNode = (id: string) =>
+                      Option.isSome(hosted)
+                        ? HostedAttackGraph.getNode(hosted.value.db, hosted.value.engagementID, id)
+                        : graph.getNode(context.sessionID, id)
+                    const getNeighbors = (id: string) =>
+                      Option.isSome(hosted)
+                        ? HostedAttackGraph.getNeighbors(hosted.value.db, hosted.value.engagementID, id)
+                        : graph.getNeighbors(context.sessionID, id)
+                    const getGraph = () =>
+                      Option.isSome(hosted)
+                        ? HostedAttackGraph.getGraph(hosted.value.db, hosted.value.engagementID)
+                        : graph.getGraph(context.sessionID)
+
                     let summary = "Unknown action."
                     switch (input.action) {
                       case "add_node": {
@@ -77,7 +109,7 @@ const layer = Layer.effectDiscard(
                           summary = "Error: nodeId, nodeType, nodeLabel, and nodeStatus are required to add a node."
                           break
                         }
-                        const node = yield* graph.addNode(context.sessionID, {
+                        const node = yield* addNode({
                           id: input.nodeId,
                           type: input.nodeType,
                           label: input.nodeLabel,
@@ -96,7 +128,7 @@ const layer = Layer.effectDiscard(
                           summary = "Error: source, target, and relation are required to add an edge."
                           break
                         }
-                        yield* graph.addEdge(context.sessionID, {
+                        yield* addEdge({
                           source: input.source,
                           target: input.target,
                           relation: input.relation,
@@ -110,7 +142,7 @@ const layer = Layer.effectDiscard(
                           summary = "Error: nodeId and nodeStatus are required to update a node."
                           break
                         }
-                        const node = yield* graph.updateNodeStatus(context.sessionID, input.nodeId, input.nodeStatus)
+                        const node = yield* updateNodeStatus(input.nodeId, input.nodeStatus)
                         summary = node
                           ? `Node ${input.nodeId} status updated to ${input.nodeStatus}.`
                           : `Node ${input.nodeId} not found.`
@@ -121,12 +153,12 @@ const layer = Layer.effectDiscard(
                           summary = "Error: nodeId is required."
                           break
                         }
-                        const node = yield* graph.getNode(context.sessionID, input.nodeId)
+                        const node = yield* getNode(input.nodeId)
                         if (!node) {
                           summary = `Node ${input.nodeId} not found.`
                           break
                         }
-                        const neighbors = yield* graph.getNeighbors(context.sessionID, input.nodeId)
+                        const neighbors = yield* getNeighbors(input.nodeId)
                         const neighborIds = neighbors.map((n) => n.id)
                         // Cap the neighbor list so a high-degree node can't emit
                         // an unbounded id dump into the model context.
@@ -141,7 +173,7 @@ const layer = Layer.effectDiscard(
                         break
                       }
                       case "query": {
-                        const graphState = yield* graph.getGraph(context.sessionID)
+                        const graphState = yield* getGraph()
                         const nodes = Object.values(graphState.nodes)
                         // A bounded, decision-oriented digest. Dumping the full
                         // node/edge set as JSON grows the model context without
@@ -193,5 +225,5 @@ const layer = Layer.effectDiscard(
 export const node = makeLocationNode({
   name: "tool/attack-graph",
   layer,
-  deps: [ToolRegistry.node, PermissionV2.node, AttackGraphNode],
+  deps: [ToolRegistry.node, PermissionV2.node, AttackGraphNode, HostedContextNode],
 })

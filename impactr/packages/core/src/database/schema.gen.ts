@@ -183,6 +183,7 @@ export default {
           \`id\` text PRIMARY KEY,
           \`project_id\` text NOT NULL,
           \`workspace_id\` text,
+          \`engagement_id\` text,
           \`parent_id\` text,
           \`slug\` text NOT NULL,
           \`directory\` text NOT NULL,

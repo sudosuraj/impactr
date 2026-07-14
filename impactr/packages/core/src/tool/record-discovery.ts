@@ -1,13 +1,15 @@
 export * as RecordDiscoveryTool from "./record-discovery"
 
 import { ToolFailure } from "@impactr-ai/llm"
-import { Effect, Layer, Schema } from "effect"
+import { Effect, Layer, Option, Schema } from "effect"
 import { makeLocationNode } from "../effect/app-node"
 import { ToolRegistry } from "./registry"
 import { Tool } from "./tool"
 import { Tools } from "./tools"
 import { KnowledgeGraph, node as KnowledgeGraphNode } from "../knowledge/graph"
 import { KnowledgeSaturation, node as KnowledgeSaturationNode } from "../session/saturation"
+import { HostedContext, node as HostedContextNode } from "../session/hosted-context"
+import { HostedKnowledgeGraph } from "../database/hosted/knowledge"
 import { PermissionV2 } from "../permission"
 
 export const name = "record_discovery"
@@ -41,6 +43,7 @@ const layer = Layer.effectDiscard(
     const tools = yield* Tools.Service
     const graph = yield* KnowledgeGraph
     const saturation = yield* KnowledgeSaturation
+    const hostedContext = yield* HostedContext.Service
     const permission = yield* PermissionV2.Service
 
     yield* tools
@@ -64,13 +67,25 @@ const layer = Layer.effectDiscard(
               .pipe(
                 Effect.mapError(() => new ToolFailure({ message: "Permission denied: record_discovery" })),
                 Effect.andThen(
-                  graph.addFinding(context.sessionID, {
-                    type: input.type,
-                    data: input.data,
-                    noveltyScore: clamp01(input.noveltyScore),
-                    confidenceScore: clamp01(input.confidenceScore),
-                    impactScore: clamp01(input.impactScore),
-                  }).pipe(Effect.orDie)
+                  hostedContext.resolve(context.sessionID as any).pipe(
+                    Effect.flatMap((hosted) =>
+                      Option.isSome(hosted)
+                        ? HostedKnowledgeGraph.addFinding(hosted.value.db, hosted.value.engagementID, context.sessionID as any, {
+                            type: input.type,
+                            data: input.data,
+                            noveltyScore: clamp01(input.noveltyScore),
+                            confidenceScore: clamp01(input.confidenceScore),
+                            impactScore: clamp01(input.impactScore),
+                          })
+                        : graph.addFinding(context.sessionID, {
+                            type: input.type,
+                            data: input.data,
+                            noveltyScore: clamp01(input.noveltyScore),
+                            confidenceScore: clamp01(input.confidenceScore),
+                            impactScore: clamp01(input.impactScore),
+                          }).pipe(Effect.orDie),
+                    ),
+                  ),
                 ),
                 Effect.tap(() => saturation.recordFinding(context.sessionID).pipe(Effect.orDie)),
                 Effect.map((findingId) => ({ findingId: findingId as string })),
@@ -84,5 +99,5 @@ const layer = Layer.effectDiscard(
 export const node = makeLocationNode({
   name: "tool/record-discovery",
   layer,
-  deps: [ToolRegistry.node, PermissionV2.node, KnowledgeGraphNode, KnowledgeSaturationNode],
+  deps: [ToolRegistry.node, PermissionV2.node, KnowledgeGraphNode, KnowledgeSaturationNode, HostedContextNode],
 })

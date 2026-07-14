@@ -1,13 +1,16 @@
 export * as QueueHypothesisTool from "./queue-hypothesis"
 
 import { ToolFailure } from "@impactr-ai/llm"
-import { Effect, Layer, Schema } from "effect"
+import { Effect, Layer, Option, Schema } from "effect"
 import { makeLocationNode } from "../effect/app-node"
 import { ToolRegistry } from "./registry"
 import { Tool } from "./tool"
 import { Tools } from "./tools"
 import { HypothesisQueue, node as HypothesisQueueNode } from "../session/hypothesis-queue"
 import { KnowledgeGraph, node as KnowledgeGraphNode } from "../knowledge/graph"
+import { HostedContext, node as HostedContextNode } from "../session/hosted-context"
+import { HostedHypothesisQueue } from "../database/hosted/hypothesis-queue"
+import { HostedKnowledgeGraph } from "../database/hosted/knowledge"
 import { PermissionV2 } from "../permission"
 
 export const name = "queue_hypothesis"
@@ -39,6 +42,7 @@ const layer = Layer.effectDiscard(
     const tools = yield* Tools.Service
     const queue = yield* HypothesisQueue
     const graph = yield* KnowledgeGraph
+    const hostedContext = yield* HostedContext.Service
     const permission = yield* PermissionV2.Service
 
     yield* tools
@@ -62,16 +66,31 @@ const layer = Layer.effectDiscard(
               .pipe(
                 Effect.mapError(() => new ToolFailure({ message: "Permission denied: queue_hypothesis" })),
                 Effect.andThen(
-                  // Prioritize by the source finding's computed potential
-                  // (novelty × impact × confidence). Fall back to the model's
-                  // stated priority when the finding has no score yet.
-                  graph.getPotentialScore(input.sourceFindingId).pipe(
-                    Effect.flatMap((potential) =>
-                      queue.push(context.sessionID, {
-                        sourceFindingId: input.sourceFindingId,
-                        description: input.description,
-                        priority: potential > 0 ? potential : clamp01(input.priority),
-                      }).pipe(Effect.orDie),
+                  hostedContext.resolve(context.sessionID as any).pipe(
+                    Effect.flatMap((hosted) =>
+                      // Prioritize by the source finding's computed potential
+                      // (novelty × impact × confidence). Fall back to the model's
+                      // stated priority when the finding has no score yet.
+                      (Option.isSome(hosted)
+                        ? HostedKnowledgeGraph.getPotentialScore(hosted.value.db, input.sourceFindingId)
+                        : graph.getPotentialScore(input.sourceFindingId)
+                      ).pipe(
+                        Effect.flatMap((potential) =>
+                          Option.isSome(hosted)
+                            ? HostedHypothesisQueue.push(hosted.value.db, hosted.value.engagementID, context.sessionID as any, {
+                                sourceFindingId: input.sourceFindingId,
+                                description: input.description,
+                                priority: potential > 0 ? potential : clamp01(input.priority),
+                              })
+                            : queue
+                                .push(context.sessionID, {
+                                  sourceFindingId: input.sourceFindingId,
+                                  description: input.description,
+                                  priority: potential > 0 ? potential : clamp01(input.priority),
+                                })
+                                .pipe(Effect.orDie),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -86,5 +105,5 @@ const layer = Layer.effectDiscard(
 export const node = makeLocationNode({
   name: "tool/queue-hypothesis",
   layer,
-  deps: [ToolRegistry.node, PermissionV2.node, HypothesisQueueNode, KnowledgeGraphNode],
+  deps: [ToolRegistry.node, PermissionV2.node, HypothesisQueueNode, KnowledgeGraphNode, HostedContextNode],
 })
