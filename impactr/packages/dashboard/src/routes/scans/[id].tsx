@@ -1,7 +1,7 @@
 import { A, createAsync, useParams } from "@solidjs/router"
 import { For, Show } from "solid-js"
 import { AppShell } from "~/components/layout/app-shell"
-import { PageHeader } from "~/components/ui/page-header"
+import { Page } from "~/components/ui/page"
 import { Card, CardHeader } from "~/components/ui/card"
 import { StatCard } from "~/components/ui/stat-card"
 import { StatusBadge, type EngagementStatusTone } from "~/components/ui/badge"
@@ -37,18 +37,17 @@ export default function ScanDetail() {
 
   return (
     <AppShell>
-      <Show when={detail()} fallback={<PageHeader title="Scan" />}>
+      <Show when={detail()} fallback={<Page title="Scan"><div class="text-sm text-muted">Loading…</div></Page>}>
         {(data) => (
-          <>
-            <PageHeader
-              title={data().engagement.name}
-              description="Engagement scope and progress"
-              actions={<StatusBadge label={data().engagement.status} tone={STATUS_TONE[data().engagement.status] ?? "neutral"} />}
-            />
-            <div class="space-y-6 p-8">
-              <A href="/scans" class="text-sm text-muted-foreground hover:text-foreground">
-                ← Back to scans
-              </A>
+          <Page
+            title={data().engagement.name}
+            description="Engagement scope and progress"
+            actions={<StatusBadge label={data().engagement.status} tone={STATUS_TONE[data().engagement.status] ?? "neutral"} />}
+          >
+            <A href="/scans" class="text-sm text-muted hover:text-foreground">
+              ← Back to scans
+            </A>
+            <div class="mt-6 space-y-6">
 
               <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <StatCard label="Assets Mapped" value={data().graph.totalNodes} />
@@ -98,7 +97,7 @@ export default function ScanDetail() {
                 </div>
               </Card>
             </div>
-          </>
+          </Page>
         )}
       </Show>
     </AppShell>

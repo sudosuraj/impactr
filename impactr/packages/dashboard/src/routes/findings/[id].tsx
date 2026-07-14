@@ -1,7 +1,7 @@
 import { A, createAsync, useParams } from "@solidjs/router"
 import { createSignal, Show } from "solid-js"
 import { AppShell } from "~/components/layout/app-shell"
-import { PageHeader } from "~/components/ui/page-header"
+import { Page } from "~/components/ui/page"
 import { Card } from "~/components/ui/card"
 import { Tabs } from "~/components/ui/tabs"
 import { SeverityBadge, Badge } from "~/components/ui/badge"
@@ -17,24 +17,23 @@ export default function FindingDetail() {
 
   return (
     <AppShell>
-      <Show when={finding()} fallback={<PageHeader title="Finding" />}>
+      <Show when={finding()} fallback={<Page title="Finding"><div class="text-sm text-muted">Loading…</div></Page>}>
         {(f) => (
-          <>
-            <PageHeader
-              title={f().title}
-              description={`CVSS ${f().cvss}`}
-              actions={
-                <>
-                  <SeverityBadge severity={f().severity} />
-                  <Badge class="capitalize">{f().status.replace("_", " ")}</Badge>
-                </>
-              }
-            />
-            <div class="space-y-5 p-8">
-              <A href="/findings" class="text-sm text-muted-foreground hover:text-foreground">
-                ← Back to findings
-              </A>
+          <Page
+            title={f().title}
+            description={`CVSS ${f().cvss}`}
+            actions={
+              <>
+                <SeverityBadge severity={f().severity} />
+                <Badge class="capitalize">{f().status.replace("_", " ")}</Badge>
+              </>
+            }
+          >
+            <A href="/findings" class="text-sm text-muted hover:text-foreground">
+              ← Back to findings
+            </A>
 
+            <div class="mt-5 space-y-5">
               <Tabs
                 active={tab()}
                 onChange={(value) => setTab(value as Tab)}
@@ -77,7 +76,7 @@ export default function FindingDetail() {
                 </Card>
               </Show>
             </div>
-          </>
+          </Page>
         )}
       </Show>
     </AppShell>
