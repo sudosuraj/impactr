@@ -18,6 +18,8 @@ export interface Interface {
   readonly popHighestPriority: (sessionId: string) => Effect.Effect<Hypothesis | undefined>
   readonly peekAll: (sessionId: string) => Effect.Effect<ReadonlyArray<Hypothesis>>
   readonly complete: (id: string, outcome: HypothesisOutcome) => Effect.Effect<void>
+  /** Return hypotheses left "processing" by an interrupted drain to "pending" so they are re-explored. */
+  readonly reclaimStale: (sessionId: string) => Effect.Effect<void>
 }
 
 export class HypothesisQueue extends Context.Service<HypothesisQueue, Interface>()("@impactr-ai/core/session/hypothesis-queue") {}
@@ -30,6 +32,21 @@ export const layer = Layer.effect(
     return HypothesisQueue.of({
       push: (sessionId, hypothesis) =>
         Effect.gen(function* () {
+          // Dedupe: don't queue a hypothesis identical to one already pending,
+          // so the engine doesn't spend cycles re-exploring the same lead.
+          const existing = yield* db.select({ id: HypothesisQueueTable.id })
+            .from(HypothesisQueueTable)
+            .where(
+              and(
+                eq(HypothesisQueueTable.session_id, sessionId as any),
+                eq(HypothesisQueueTable.status, "pending"),
+                eq(HypothesisQueueTable.description, hypothesis.description),
+              ),
+            )
+            .get()
+            .pipe(Effect.orDie)
+          if (existing) return existing.id
+
           const id = crypto.randomUUID()
           yield* db.insert(HypothesisQueueTable).values({
             id,
@@ -39,7 +56,7 @@ export const layer = Layer.effect(
             priority: hypothesis.priority,
             status: "pending",
           }).pipe(Effect.orDie)
-          
+
           return id
         }),
 
@@ -89,6 +106,17 @@ export const layer = Layer.effect(
         db.update(HypothesisQueueTable)
           .set({ status: outcome })
           .where(eq(HypothesisQueueTable.id, id))
+          .pipe(Effect.orDie, Effect.asVoid),
+
+      reclaimStale: (sessionId) =>
+        db.update(HypothesisQueueTable)
+          .set({ status: "pending" })
+          .where(
+            and(
+              eq(HypothesisQueueTable.session_id, sessionId as any),
+              eq(HypothesisQueueTable.status, "processing"),
+            ),
+          )
           .pipe(Effect.orDie, Effect.asVoid),
     })
   })
