@@ -544,6 +544,12 @@ const layer = Layer.effect(
                 }),
                 delivery: "queue",
               })
+              // Promote the just-admitted hypothesis on the next turn. Without this the
+              // loop keeps promotion = "steer" (set above after each turn), so the
+              // "queue"-delivery hypothesis is never promoted into context: the engine
+              // would mark every hypothesis "done" while running no-op turns on stale
+              // context, exploring none of its own leads.
+              promotion = "queue"
               needsContinuation = true
             }
           }

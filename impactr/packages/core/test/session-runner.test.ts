@@ -34,6 +34,7 @@ import { SessionExecution } from "@impactr-ai/core/session/execution"
 import { SessionRunCoordinator } from "@impactr-ai/core/session/run-coordinator"
 import { SessionRunner } from "@impactr-ai/core/session/runner"
 import * as SessionRunnerLLM from "@impactr-ai/core/session/runner/llm"
+import * as HypothesisQueue from "@impactr-ai/core/session/hypothesis-queue"
 import { SessionRunnerModel } from "@impactr-ai/core/session/runner/model"
 import { ToolRegistry } from "@impactr-ai/core/tool/registry"
 import { ApplicationTools } from "@impactr-ai/core/tool/application-tools"
@@ -273,6 +274,7 @@ const it = testEffect(
       SessionRunnerLLM.node,
       SessionExecution.node,
       SessionV2.node,
+      HypothesisQueue.node,
     ]),
     [
       [LayerNodePlatform.llmClient, client],
@@ -1895,6 +1897,50 @@ describe("SessionRunnerLLM", () => {
       expect(userTexts(requests[0]!)).toEqual(["Start working"])
       expect(userTexts(requests[1]!)).toEqual(["Start working"])
       expect(userTexts(requests[2]!)).toEqual(["Start working", "Wait until continuation ends"])
+    }),
+  )
+
+  it.effect("explores a queued hypothesis once the initial turn goes idle", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      const queue = yield* HypothesisQueue.HypothesisQueue
+      yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "Start working" }), resume: false })
+
+      const hypothesisId = yield* queue.push(sessionID, {
+        sourceFindingId: "finding-1",
+        description: "probe /admin for weak auth",
+        priority: 5,
+      })
+
+      requests.length = 0
+      responses = [
+        [
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.stepFinish({ index: 0, reason: "stop" }),
+          LLMEvent.finish({ reason: "stop" }),
+        ],
+        [
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.stepFinish({ index: 0, reason: "stop" }),
+          LLMEvent.finish({ reason: "stop" }),
+        ],
+      ]
+      yield* session.resume(sessionID)
+
+      // The hypothesis must be promoted into the very next turn's context — not
+      // dropped while the engine burns a no-op turn on stale context.
+      expect(requests).toHaveLength(2)
+      expect(userTexts(requests[0]!)).toEqual(["Start working"])
+      expect(userTexts(requests[1]!)).toEqual([
+        "Start working",
+        "Exploring hypothesis: probe /admin for weak auth",
+      ])
+
+      // And it should only be marked done after it was actually explored.
+      const remaining = yield* queue.peekAll(sessionID)
+      expect(remaining).toHaveLength(0)
+      yield* queue.complete(hypothesisId, "done")
     }),
   )
 
