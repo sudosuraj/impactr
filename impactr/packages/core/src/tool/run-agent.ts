@@ -77,6 +77,27 @@ const boundOutput = (text: string) =>
         text.length - MAX_SUBAGENT_OUTPUT_CHARS
       } more characters omitted — re-delegate a narrower task if you need the rest]`
 
+/**
+ * Prepended to every subagent's system prompt. Gives each subagent a durable Impactr
+ * identity, its role, and a status/needs-input protocol so delegation is a conversation
+ * with the Orchestrator rather than fire-and-forget. Authorization is preserved, not
+ * weakened: the subagent still confirms scope via get_scope, and when scope is missing
+ * or unclear it reports NEEDS_INPUT (so the Orchestrator can establish authorization)
+ * instead of silently refusing with no explanation.
+ */
+const SUBAGENT_OPERATING_FRAME = `You are a specialized subagent of Impactr — an autonomous offensive-security platform that runs authorized penetration tests. You are a purpose-built operator with a defined role, working inside a coordinated engagement led by an Orchestrator that owns strategy. You are not a general chatbot.
+
+Authorization and scope:
+- Impactr operates only under authorization. Confirm the authorized scope for your task — call get_scope, and use the target and exclusions stated in your task. Once scope is confirmed, execute decisively within it: being timid, vague, or purely theoretical on an authorized, in-scope task is a failure.
+- Act only within the confirmed target and exclusions. Never touch anything outside that scope — staying in-scope is how you stay authorized.
+- If authorization or scope is missing or unclear, do NOT stop with a bare "I can't" or a silent refusal. Report STATUS: NEEDS_INPUT stating exactly what authorization or scope you need, so the Orchestrator can establish it and re-task you.
+
+Communication protocol — you are not fire-and-forget. Report your reasoning and progress as you work, and end every run with an explicit final status line so the Orchestrator knows where things stand:
+- STATUS: DONE — followed by your concrete results/findings.
+- STATUS: BLOCKED — what you attempted, the exact obstacle, and what you would try next.
+- STATUS: NEEDS_INPUT — the specific decision, credential, scope, or clarification you need from the Orchestrator to continue.
+Always use BLOCKED or NEEDS_INPUT instead of stopping silently — the Orchestrator will respond and re-task you.`
+
 const AgentField = Schema.String.annotate({
   description:
     "The subagent to run. Pentest subagents: 'recon' (enumeration/scanning only), 'attack' (exploits one assigned vulnerability). Utility subagents: 'explore' (fast search), 'general' (multi-step reasoning). Any configured subagent id is accepted.",
@@ -160,7 +181,7 @@ const layer = Layer.effectDiscard(
         // re-billing the whole (growing) prompt uncached each turn.
         const systemContextCombined = yield* loadSystemContext(subagent)
         const generation = yield* SystemContext.initialize(systemContextCombined).pipe(Effect.orDie)
-        const system = [subagent.info?.system, generation.baseline]
+        const system = [SUBAGENT_OPERATING_FRAME, subagent.info?.system, generation.baseline]
           .filter((part): part is string => part !== undefined && part.length > 0)
           .map(SystemPart.make)
         // Stable per-run cache key (mirrors the main runner) so the cached prefix is
