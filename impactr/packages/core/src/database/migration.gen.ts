@@ -45,5 +45,6 @@ export const migrations = (
     import("./migration/20260714000000_dedupe_graph_node"),
     import("./migration/20260714010000_hypothesis_queue_priority_index"),
     import("./migration/20260714110000_add_session_engagement_id"),
+    import("./migration/20260715120000_add_engagement_local"),
   ])
 ).map((module) => module.default) satisfies DatabaseMigration.Migration[]
