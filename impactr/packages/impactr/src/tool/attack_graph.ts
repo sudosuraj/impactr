@@ -17,14 +17,14 @@ export const Parameters = Schema.Struct({
 
 export const AttackGraphTool = Tool.define(
   "attack_graph",
-  Effect.succeed({
+  Effect.gen(function* () {
+    const graph = yield* AttackGraph.Service
+    return {
     description: "Interact with the global Attack Graph. You can add nodes (targets, findings), add edges (relationships), update node status, or query the graph to understand your current pentesting state.",
     parameters: Parameters,
     execute: ({ action, nodeId, nodeType, nodeLabel, nodeAttributes, nodeStatus, source, target, relation }, ctx) => Effect.gen(function* () {
-      const graph = yield* AttackGraph.Service
-
       if (action === "add_node") {
-        if (!nodeId || !nodeType || !nodeLabel || !nodeStatus) return { output: "Error: nodeId, nodeType, nodeLabel, and nodeStatus are required to add a node." }
+        if (!nodeId || !nodeType || !nodeLabel || !nodeStatus) return "Error: nodeId, nodeType, nodeLabel, and nodeStatus are required to add a node."
         const node = yield* graph.addNode({
           id: nodeId,
           type: nodeType as NodeType,
@@ -32,40 +32,44 @@ export const AttackGraphTool = Tool.define(
           attributes: nodeAttributes ?? {},
           status: nodeStatus as NodeStatus,
         })
-        return { output: `Node added/retrieved successfully:\n${JSON.stringify(node, null, 2)}` }
+        return `Node added/retrieved successfully:\n${JSON.stringify(node, null, 2)}`
       }
 
       if (action === "add_edge") {
-        if (!source || !target || !relation) return { output: "Error: source, target, and relation are required to add an edge." }
+        if (!source || !target || !relation) return "Error: source, target, and relation are required to add an edge."
         yield* graph.addEdge({
           source,
           target,
           relation: relation as EdgeRelation,
           attributes: nodeAttributes ?? {},
         })
-        return { output: `Edge added: ${source} --[${relation}]--> ${target}` }
+        return `Edge added: ${source} --[${relation}]--> ${target}`
       }
 
       if (action === "update_status") {
-        if (!nodeId || !nodeStatus) return { output: "Error: nodeId and nodeStatus are required to update a node." }
+        if (!nodeId || !nodeStatus) return "Error: nodeId and nodeStatus are required to update a node."
         const node = yield* graph.updateNodeStatus(nodeId, nodeStatus as NodeStatus)
-        return { output: `Node ${nodeId} status updated to ${nodeStatus}.` }
+        return `Node ${nodeId} status updated to ${nodeStatus}.`
       }
 
       if (action === "get_node") {
-        if (!nodeId) return { output: "Error: nodeId is required." }
+        if (!nodeId) return "Error: nodeId is required."
         const node = yield* graph.getNode(nodeId)
-        if (!node) return { output: `Node ${nodeId} not found.` }
+        if (!node) return `Node ${nodeId} not found.`
         const neighbors = yield* graph.getNeighbors(nodeId)
-        return { output: `Node Info:\n${JSON.stringify(node, null, 2)}\n\nNeighbors:\n${JSON.stringify(neighbors.map(n => n.id), null, 2)}` }
+        return `Node Info:\n${JSON.stringify(node, null, 2)}\n\nNeighbors:\n${JSON.stringify(neighbors.map(n => n.id), null, 2)}`
       }
 
       if (action === "query") {
         const state = yield* graph.getGraph()
-        return { output: `Attack Graph Summary:\nTotal Nodes: ${Object.keys(state.nodes).length}\nTotal Edges: ${state.edges.length}\n\nNodes:\n${JSON.stringify(state.nodes, null, 2)}\n\nEdges:\n${JSON.stringify(state.edges, null, 2)}` }
+        return `Attack Graph Summary:\nTotal Nodes: ${Object.keys(state.nodes).length}\nTotal Edges: ${state.edges.length}\n\nNodes:\n${JSON.stringify(state.nodes, null, 2)}\n\nEdges:\n${JSON.stringify(state.edges, null, 2)}`
       }
 
-      return { output: "Unknown action." }
-    }).pipe(Effect.catchAll(e => Effect.succeed({ output: `Error: ${e instanceof Error ? e.message : String(e)}` })))
+      return "Unknown action."
+    }).pipe(
+      Effect.catch((e: unknown) => Effect.succeed(`Error: ${e instanceof Error ? e.message : String(e)}`)),
+      Effect.map((output) => ({ title: `attack_graph: ${action}`, metadata: {}, output })),
+    ),
+    }
   })
 )

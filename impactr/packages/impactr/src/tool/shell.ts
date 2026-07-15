@@ -349,6 +349,10 @@ export const ShellTool = Tool.define(
     const trunc = yield* Truncate.Service
     const plugin = yield* Plugin.Service
     const flags = yield* RuntimeFlags.Service
+    const database = yield* Database.Service
+    const sessions = yield* Session.Service
+    const scope = yield* Scope.Scope
+    const background = yield* BackgroundJob.Service
     const defaultTimeoutMs = flags.bashDefaultTimeoutMs ?? 10 * 60 * 1000
 
     const cygpath = Effect.fn("ShellTool.cygpath")(function* (shell: string, text: string) {
@@ -607,9 +611,6 @@ export const ShellTool = Tool.define(
         const name = Shell.name(shell)
         const limits = yield* trunc.limits()
         const prompt = ShellPrompt.render(name, process.platform, limits, defaultTimeoutMs)
-        const database = yield* Database.Service
-        const sessions = yield* Session.Service
-        const scope = yield* Scope.Scope
         yield* Effect.logInfo("shell tool using shell", { shell })
 
         return {
@@ -639,7 +640,6 @@ export const ShellTool = Tool.define(
 
               const env = yield* shellEnv(ctx, cwd, params.env)
               if (params.background) {
-                const background = yield* BackgroundJob.Service
                 // Create a detached abort controller so the task doesn't die when the tool call finishes
                 const detachedController = new AbortController()
                 const detachedCtx: Tool.Context = {
@@ -653,6 +653,7 @@ export const ShellTool = Tool.define(
                   Effect.provideService(Database.Service, database),
                   Effect.orDie,
                 )
+                if (msg.info.role !== "assistant") throw new Error("Expected an assistant message for the background shell tool call")
                 const variant = msg.info.variant
 
                 const inject = Effect.fn("ShellTool.injectBackgroundResult")(function* (
@@ -696,8 +697,11 @@ export const ShellTool = Tool.define(
                   Effect.forkIn(scope, { startImmediately: true })
                 )
 
+                const startedMessage = `Command started in background with Task ID: ${jobInfo.id}\nYou will be notified when it completes, or you can use manage_task to check its status.`
                 return {
-                  output: `Command started in background with Task ID: ${jobInfo.id}\nYou will be notified when it completes, or you can use manage_task to check its status.`,
+                  title: params.command,
+                  metadata: { output: startedMessage, exit: null, truncated: false },
+                  output: startedMessage,
                 }
               }
 

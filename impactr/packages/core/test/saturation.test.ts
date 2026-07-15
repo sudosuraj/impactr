@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { Duration, Effect } from "effect"
 import { AppNodeBuilder } from "@impactr-ai/core/effect/app-node-builder"
-import { KnowledgeSaturation } from "@impactr-ai/core/session/saturation"
+import { KnowledgeSaturation, node as KnowledgeSaturationNode } from "@impactr-ai/core/session/saturation"
 
 const run = <A>(body: Effect.Effect<A, never, KnowledgeSaturation>) =>
-  Effect.runPromise(body.pipe(Effect.provide(AppNodeBuilder.build(KnowledgeSaturation.node, []))))
+  Effect.runPromise(body.pipe(Effect.provide(AppNodeBuilder.build(KnowledgeSaturationNode, []))))
 
 describe("KnowledgeSaturation", () => {
   test("tracks discovery rate independently per session", async () => {

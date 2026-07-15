@@ -19,8 +19,8 @@ export function ExposureRing(props: { index: number; critical: number; high: num
             stroke={color()}
             stroke-width="10"
             stroke-linecap="round"
-            stroke-dasharray={CIRC}
-            stroke-dashoffset={offset()}
+            stroke-dasharray={String(CIRC)}
+            stroke-dashoffset={String(offset())}
             transform="rotate(-90 64 64)"
             style={{ transition: "stroke-dashoffset .8s ease" }}
           />

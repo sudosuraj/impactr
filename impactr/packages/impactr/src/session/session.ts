@@ -38,6 +38,7 @@ import { SessionID, MessageID, PartID } from "./schema"
 
 import type { Provider } from "@/provider/provider"
 import { Global } from "@impactr-ai/core/global"
+import { EngagementSchema } from "@impactr-ai/core/engagement/schema"
 import { Effect, Layer, Option, Context, Schema, Types } from "effect"
 import { NonNegativeInt, optional } from "@impactr-ai/core/schema"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -80,6 +81,7 @@ export function fromRow(row: SessionRow): Info {
     slug: row.slug,
     projectID: row.project_id,
     workspaceID: row.workspace_id ?? undefined,
+    engagementID: row.engagement_id ?? undefined,
     directory: row.directory,
     path: row.path ?? undefined,
     parentID: row.parent_id ?? undefined,
@@ -122,6 +124,7 @@ export function toRow(info: Info) {
     id: info.id,
     project_id: info.projectID,
     workspace_id: info.workspaceID,
+    engagement_id: info.engagementID,
     parent_id: info.parentID,
     slug: info.slug,
     directory: info.directory,
@@ -226,6 +229,7 @@ export const Info = Schema.Struct({
   slug: Schema.String,
   projectID: ProjectV2.ID,
   workspaceID: optional(WorkspaceV2.ID),
+  engagementID: optional(EngagementSchema.ID),
   directory: Schema.String,
   path: optional(Schema.String),
   parentID: optional(SessionID),
@@ -266,6 +270,7 @@ export const CreateInput = Schema.optional(
     metadata: Schema.optional(Metadata),
     permission: Schema.optional(PermissionV1.Ruleset),
     workspaceID: Schema.optional(WorkspaceV2.ID),
+    engagementID: Schema.optional(EngagementSchema.ID),
   }),
 )
 export type CreateInput = Types.DeepMutable<Schema.Schema.Type<typeof CreateInput>>
@@ -423,6 +428,7 @@ export interface Interface {
     metadata?: typeof Metadata.Type
     permission?: PermissionV1.Ruleset
     workspaceID?: WorkspaceV2.ID
+    engagementID?: EngagementSchema.ID
   }) => Effect.Effect<Info>
   readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info, NotFound>
   readonly touch: (sessionID: SessionID) => Effect.Effect<void>
@@ -505,6 +511,7 @@ const layer: Layer.Layer<
       model?: Schema.Schema.Type<typeof Model>
       parentID?: SessionID
       workspaceID?: WorkspaceV2.ID
+      engagementID?: EngagementSchema.ID
       directory: string
       path?: string
       metadata?: typeof Metadata.Type
@@ -519,6 +526,7 @@ const layer: Layer.Layer<
         directory: input.directory,
         path: input.path,
         workspaceID: input.workspaceID,
+        engagementID: input.engagementID,
         parentID: input.parentID,
         title: input.title ?? (input.parentID ? childTitlePrefix : parentTitlePrefix) + new Date().toISOString(),
         agent: input.agent,
@@ -674,6 +682,7 @@ const layer: Layer.Layer<
       metadata?: typeof Metadata.Type
       permission?: PermissionV1.Ruleset
       workspaceID?: WorkspaceV2.ID
+      engagementID?: EngagementSchema.ID
     }) {
       const ctx = yield* InstanceState.context
       const workspace = yield* InstanceState.workspaceID
@@ -687,6 +696,7 @@ const layer: Layer.Layer<
         metadata: input?.metadata,
         permission: input?.permission,
         workspaceID: input?.workspaceID ?? workspace,
+        engagementID: input?.engagementID,
       })
     })
 

@@ -13,6 +13,14 @@ const lock = Semaphore.makeUnsafe(1)
 export type Migration = {
   id: string
   up: (tx: Transaction) => Effect.Effect<void, unknown>
+  /**
+   * Run this migration's `up` even on a fresh database bootstrapped from schema.gen.ts.
+   * schema.gen.ts is produced by drizzle-kit and can only express Drizzle-defined tables,
+   * so migrations that create objects Drizzle cannot model (FTS5 virtual tables, triggers)
+   * would otherwise be marked complete without ever running, leaving fresh installs without
+   * those objects. Flag such migrations so the bootstrap path creates them explicitly.
+   */
+  bootstrap?: boolean
 }
 
 export function apply(db: Database) {
@@ -29,10 +37,16 @@ export function apply(db: Database) {
           yield* tx.run(
             sql`CREATE TABLE ${sql.identifier("migration")} (id TEXT PRIMARY KEY, time_completed INTEGER NOT NULL)`,
           )
-          yield* Effect.forEach(migrations, (migration) =>
-            tx.run(
-              sql`INSERT INTO ${sql.identifier("migration")} (id, time_completed) VALUES (${migration.id}, ${Date.now()})`,
-            ),
+          yield* Effect.forEach(migrations, (migration: Migration) =>
+            Effect.gen(function* () {
+              // schema.gen.ts already reflects every Drizzle-modeled migration, so those are
+              // marked complete without replaying. Migrations flagged `bootstrap` create objects
+              // schema.gen.ts cannot express and must actually run on a fresh database.
+              if (migration.bootstrap) yield* migration.up(tx)
+              yield* tx.run(
+                sql`INSERT INTO ${sql.identifier("migration")} (id, time_completed) VALUES (${migration.id}, ${Date.now()})`,
+              )
+            }),
           )
         }),
       )

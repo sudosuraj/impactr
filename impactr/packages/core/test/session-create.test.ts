@@ -6,6 +6,7 @@ import { asc, eq } from "drizzle-orm"
 import { Database } from "@impactr-ai/core/database/database"
 import { AppNodeBuilder } from "@impactr-ai/core/effect/app-node-builder"
 import { LayerNode } from "@impactr-ai/core/effect/layer-node"
+import { EngagementSchema } from "@impactr-ai/core/engagement/schema"
 import { EventV2 } from "@impactr-ai/core/event"
 import { EventTable } from "@impactr-ai/core/event/sql"
 import { Location } from "@impactr-ai/core/location"
@@ -90,6 +91,41 @@ describe("SessionV2.create", () => {
           model,
         }),
       ).toMatchObject({ location: { directory: location.directory, workspaceID }, agent: "build", model })
+    }),
+  )
+
+  it.effect("persists the supplied engagement ID for hosted-database linking", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const { db } = yield* Database.Service
+      const engagementID = EngagementSchema.ID.create()
+
+      const created = yield* session.create({ location, engagementID })
+
+      const row = yield* db
+        .select({ engagement_id: SessionTable.engagement_id })
+        .from(SessionTable)
+        .where(eq(SessionTable.id, created.id))
+        .get()
+        .pipe(Effect.orDie)
+      expect(row?.engagement_id).toBe(engagementID)
+    }),
+  )
+
+  it.effect("leaves the engagement ID unset for pure local sessions", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+      const { db } = yield* Database.Service
+
+      const created = yield* session.create({ location })
+
+      const row = yield* db
+        .select({ engagement_id: SessionTable.engagement_id })
+        .from(SessionTable)
+        .where(eq(SessionTable.id, created.id))
+        .get()
+        .pipe(Effect.orDie)
+      expect(row?.engagement_id).toBeNull()
     }),
   )
 

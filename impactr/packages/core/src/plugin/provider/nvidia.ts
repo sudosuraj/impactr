@@ -13,7 +13,7 @@ export const NvidiaPlugin = define({
           evt.provider.update(item.provider.id, (provider) => {
             provider.request.headers["HTTP-Referer"] = "https://impactr.dev/"
             provider.request.headers["X-Title"] = "impactr"
-            provider.request.headers["X-BILLING-INVOKE-ORIGIN"] ??= "impactr"
+            provider.request.headers["X-BILLING-INVOKE-ORIGIN"] ??= "Impactr"
           })
         }
       }),

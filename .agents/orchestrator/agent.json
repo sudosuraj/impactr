@@ -10,6 +10,7 @@
     "shell": "allow",
     "ask_permission": "allow",
     "manage_task": "allow",
-    "task": "allow"
+    "task": "allow",
+    "question": "deny"
   }
 }

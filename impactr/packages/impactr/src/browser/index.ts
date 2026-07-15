@@ -1,12 +1,12 @@
-import { Context, Effect, Layer, Ref, Scope } from "effect"
-import { chromium, Browser as PlaywrightBrowser, Page } from "playwright"
+import { Context, Effect, Layer, Ref } from "effect"
+import { chromium, type Browser as PlaywrightBrowser, type Page } from "playwright"
 
 export interface Interface {
-  readonly goto: (url: string) => Effect.Effect<void>
-  readonly click: (selector: string) => Effect.Effect<void>
-  readonly type: (selector: string, text: string) => Effect.Effect<void>
-  readonly evaluate: (js: string) => Effect.Effect<unknown>
-  readonly extractHtml: () => Effect.Effect<string>
+  readonly goto: (url: string) => Effect.Effect<void, Error>
+  readonly click: (selector: string) => Effect.Effect<void, Error>
+  readonly type: (selector: string, text: string) => Effect.Effect<void, Error>
+  readonly evaluate: (js: string) => Effect.Effect<unknown, Error>
+  readonly extractHtml: () => Effect.Effect<string, Error>
   readonly close: () => Effect.Effect<void>
 }
 
@@ -88,7 +88,7 @@ export const layer = Layer.effect(
           catch: (e) => new Error(`Failed to extract HTML: ${e}`)
         })
       }),
-      close
+      close: () => close,
     })
   })
 )

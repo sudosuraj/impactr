@@ -40,7 +40,7 @@ function oauth(http: HttpClient.HttpClient) {
     method: {
       id: methodID,
       type: "oauth",
-      label: "impactr Console account",
+      label: "Impactr Console account",
     },
     authorize: () =>
       Effect.gen(function* () {

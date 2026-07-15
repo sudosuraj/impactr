@@ -1,0 +1,20 @@
+{
+  "target": {
+    "name": "Spreaker",
+    "scope": "*.spreaker.com",
+    "exclusions": [
+      "blog.spreaker.com",
+      "try.spreaker.com", 
+      "help.spreaker.com",
+      "elasticemail.spreaker.com",
+      "elasticmta1.spreaker.com",
+      "elasticmta2.spreaker.com",
+      "careers.spreaker.com",
+      "open.spreaker.com"
+    ],
+    "mobile_apps": true,
+    "bounty_range": "$100-$1000"
+  },
+  "nodes": [],
+  "edges": []
+}

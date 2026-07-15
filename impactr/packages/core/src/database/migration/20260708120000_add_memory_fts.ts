@@ -3,6 +3,9 @@ import type { DatabaseMigration } from "../migration"
 
 export default {
   id: "20260708120000_add_memory_fts",
+  // Creates FTS5 virtual tables and triggers, which drizzle-kit cannot emit into schema.gen.ts.
+  // Without this flag a fresh database would never get these objects. See DatabaseMigration.apply.
+  bootstrap: true,
   up(tx) {
     return Effect.gen(function* () {
       yield* tx.run(`

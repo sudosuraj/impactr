@@ -139,13 +139,7 @@ const layer = Layer.effect(
     const global = yield* Global.Service
     const location = yield* Location.Service
     const policy = yield* Policy.Service
-    const names = [
-      "impactr.config.ts",
-      "impactr.json",
-      "impactr.jsonc",
-      "impactr.json",
-      "impactr.jsonc",
-    ]
+    const names = ["impactr.config.ts", "impactr.json", "impactr.jsonc"]
     const decodeOptions = { errors: "all", onExcessProperty: "ignore", propertyOrder: "original" } as const
     const decodeInfo = Schema.decodeUnknownOption(Info, decodeOptions)
     const decodeV1Info = Schema.decodeUnknownOption(ConfigV1.Info, decodeOptions)
@@ -206,7 +200,7 @@ const layer = Layer.effect(
       ? []
       : yield* fs
           .up({
-            targets: [".impactr", ".impactr", ...names.toReversed()],
+            targets: [".impactr", ...names.toReversed()],
             start: location.directory,
             stop: location.project.directory,
           })
@@ -214,20 +208,14 @@ const layer = Layer.effect(
     const directories = [
       globalDirectory,
       ...discovered
-        .filter((item) => {
-          const base = path.basename(item)
-          return base === ".impactr" || base === ".impactr"
-        })
+        .filter((item) => path.basename(item) === ".impactr")
         .toReversed()
         .map((directory) => AbsolutePath.make(directory)),
     ]
     // A config closer to the opened directory should win over one higher up.
     // Search starts nearby, so reverse the results before applying them.
     const directPaths = discovered
-      .filter((item) => {
-        const base = path.basename(item)
-        return base !== ".impactr" && base !== ".impactr"
-      })
+      .filter((item) => path.basename(item) !== ".impactr")
       .toReversed()
     const direct = yield* Effect.forEach(directPaths, loadFile).pipe(
       Effect.orDie,

@@ -9,41 +9,40 @@ export const Parameters = Schema.Struct({
 
 export const ManageTaskTool = Tool.define(
   "manage_task",
-  Effect.succeed({
+  Effect.gen(function* () {
+    const background = yield* BackgroundJob.Service
+    return {
     description: "Manage background tasks. Use this tool to list running tasks or interact with tasks that were sent to the background via background=true flag.",
     parameters: Parameters,
     execute: ({ action, taskId }, ctx) => Effect.gen(function* () {
-      const background = yield* BackgroundJob.Service
-
       if (action === "list") {
         const jobs = yield* background.list()
         const running = jobs.filter(j => j.status === "running")
-        if (running.length === 0) return { output: "No running background tasks." }
-        return {
-          output: "Running Background Tasks:\n" + running.map(j => `- [${j.id}] ${j.type} (${j.title})`).join("\n")
-        }
+        if (running.length === 0) return "No running background tasks."
+        return "Running Background Tasks:\n" + running.map(j => `- [${j.id}] ${j.type} (${j.title})`).join("\n")
       }
 
-      if (!taskId) return { output: "Error: taskId is required for kill or status actions." }
+      if (!taskId) return "Error: taskId is required for kill or status actions."
 
       if (action === "kill") {
         const result = yield* background.cancel(taskId)
-        if (!result) return { output: `Task ${taskId} not found.` }
-        return { output: `Task ${taskId} has been cancelled.` }
+        if (!result) return `Task ${taskId} not found.`
+        return `Task ${taskId} has been cancelled.`
       }
 
       if (action === "status") {
         const job = yield* background.get(taskId)
-        if (!job) return { output: `Task ${taskId} not found.` }
-        
+        if (!job) return `Task ${taskId} not found.`
+
         let out = `Task: ${job.id}\nType: ${job.type}\nStatus: ${job.status}\n`
         if (job.title) out += `Title: ${job.title}\n`
         if (job.output) out += `\n--- Output ---\n${job.output}\n`
         if (job.error) out += `\n--- Error ---\n${job.error}\n`
-        return { output: out }
+        return out
       }
 
-      return { output: "Unknown action" }
-    })
+      return "Unknown action"
+    }).pipe(Effect.map((output) => ({ title: `manage_task: ${action}`, metadata: {}, output }))),
+    }
   })
 )

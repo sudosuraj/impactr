@@ -171,6 +171,10 @@ export const RunCommand = effectCmd({
         type: "string",
         describe: "agent to use",
       })
+      .option("engagement", {
+        type: "string",
+        describe: "engagement id to associate with this session (links pentest findings/attack-graph to the hosted dashboard)",
+      })
       .option("format", {
         type: "string",
         choices: ["default", "json"],
@@ -519,6 +523,7 @@ export const RunCommand = effectCmd({
         const result = await sdk.session.create({
           title: name,
           permission: [...rules],
+          engagementID: args.engagement,
         })
         const id = result.data?.id
         if (!id) {
@@ -562,6 +567,7 @@ export const RunCommand = effectCmd({
               }
             : undefined,
           permission: [...rules],
+          engagementID: args.engagement,
         })
         const id = result.data?.id
         if (!id) {
@@ -968,6 +974,7 @@ type MiniCommandInput = {
   fork?: boolean
   model?: string
   agent?: string
+  engagement?: string
   prompt?: string
   replay?: boolean
   replayLimit?: number
@@ -987,6 +994,7 @@ export async function runMini(input: MiniCommandInput) {
     share: undefined,
     model: input.model,
     agent: input.agent,
+    engagement: input.engagement,
     format: "default",
     file: undefined,
     title: undefined,

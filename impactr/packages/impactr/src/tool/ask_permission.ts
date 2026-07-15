@@ -19,10 +19,11 @@ export const AskPermissionTool = Tool.define(
         patterns: [pattern],
         metadata: { reason },
         always: [],
-        ruleset: [{ action: "ask", permission: "*", pattern: "*" }]
       })
-      
+
       return {
+        title: `ask_permission: ${permission}`,
+        metadata: {},
         output: `Permission '${permission}' for '${pattern}' was requested and successfully granted.`,
       }
     })

@@ -76,7 +76,7 @@ describe("tool.registry", () => {
       const registry = yield* ToolRegistry.Service
       const agent = yield* Agent.Service
       const list = yield* agent.list()
-      const build = list.find((a) => a.id === "recon") ?? list[0]
+      const build = list.find((a) => a.name === "recon") ?? list[0]
       if (!build) throw new Error("no agent found")
       const task = (yield* registry.tools({
         providerID: ProviderV2.ID.impactr,

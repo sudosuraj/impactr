@@ -10,6 +10,7 @@ import { NonNegativeInt, optional, statics } from "../schema"
 import { ascending } from "../identifier"
 import { SessionID } from "../session-id"
 import { WorkspaceID } from "../workspace-id"
+import { EngagementID } from "../engagement-id"
 import { PermissionV1 } from "./permission"
 
 const Timestamp = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
@@ -545,6 +546,7 @@ export const SessionInfo = Schema.Struct({
   slug: Schema.String,
   projectID: Project.ID,
   workspaceID: optional(WorkspaceID),
+  engagementID: optional(EngagementID),
   directory: Schema.String,
   path: optional(Schema.String),
   parentID: optional(SessionID),

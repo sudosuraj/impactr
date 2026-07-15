@@ -172,6 +172,7 @@ export type Session = {
   slug: string
   projectID: string
   workspaceID?: string
+  engagementID?: string
   directory: string
   path?: string
   parentID?: string
@@ -1706,6 +1707,7 @@ export type AgentConfig = {
   steps?: number
   maxSteps?: number
   permission?: PermissionConfig
+  mcpServers?: Array<string>
   [key: string]:
     | unknown
     | string
@@ -1730,6 +1732,7 @@ export type AgentConfig = {
     | "info"
     | number
     | PermissionConfig
+    | Array<string>
     | undefined
 }
 
@@ -2192,6 +2195,7 @@ export type GlobalSession = {
   slug: string
   projectID: string
   workspaceID?: string
+  engagementID?: string
   directory: string
   path?: string
   parentID?: string
@@ -2362,6 +2366,7 @@ export type Agent = {
     [key: string]: unknown
   }
   steps?: number
+  mcpServers?: Array<string>
 }
 
 export type LspStatus = {
@@ -9480,6 +9485,7 @@ export type SessionCreateData = {
     }
     permission?: PermissionRuleset
     workspaceID?: string
+    engagementID?: string
   }
   path?: never
   query?: {

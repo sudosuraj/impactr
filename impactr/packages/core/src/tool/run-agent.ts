@@ -329,7 +329,9 @@ const layer = Layer.effectDiscard(
                 .join("\n\n")
               return { output: combined }
             }).pipe(
-              Effect.mapError((err) => new ToolFailure({ message: err instanceof Error ? err.message : String(err) })),
+              Effect.mapError(
+                (err: unknown) => new ToolFailure({ message: err instanceof Error ? err.message : String(err) }),
+              ),
             ),
         }),
       })

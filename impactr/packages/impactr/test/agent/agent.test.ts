@@ -50,63 +50,35 @@ it.instance("returns default native agents when no config", () =>
     const names = agents.map((a) => a.name)
     expect(names).toContain("attack")
     expect(names).toContain("recon")
-    expect(names).toContain("general")
     expect(names).toContain("enumerate")
+    expect(names).toContain("exploit")
+    expect(names).toContain("report")
     expect(names).toContain("compaction")
     expect(names).toContain("title")
     expect(names).toContain("summary")
   }),
 )
 
-it.instance("build agent has correct default properties", () =>
+it.instance("attack agent has correct default properties", () =>
   Effect.gen(function* () {
     const attack = yield* load((svc) => svc.get("attack"))
-    expect(build).toBeDefined()
-    expect(build?.mode).toBe("primary")
-    expect(build?.native).toBe(true)
-    expect(evalPerm(build, "edit")).toBe("allow")
-    expect(evalPerm(build, "bash")).toBe("allow")
+    expect(attack).toBeDefined()
+    expect(attack?.mode).toBe("primary")
+    expect(attack?.native).toBe(true)
+    expect(evalPerm(attack, "edit")).toBe("allow")
+    expect(evalPerm(attack, "bash")).toBe("allow")
   }),
 )
 
-it.instance("plan agent denies edits except .impactr/plans/*", () =>
+it.instance("recon agent denies edits but allows read and shell", () =>
   Effect.gen(function* () {
-    const plan = yield* load((svc) => svc.get("recon"))
-    expect(plan).toBeDefined()
-    // Wildcard is denied
-    expect(evalPerm(plan, "edit")).toBe("deny")
-    // But specific path is allowed
-    expect(Permission.evaluate("edit", ".impactr/plans/foo.md", plan!.permission).action).toBe("allow")
+    const recon = yield* load((svc) => svc.get("recon"))
+    expect(recon).toBeDefined()
+    // Recon maps the attack surface but never modifies it.
+    expect(evalPerm(recon, "edit")).toBe("deny")
+    expect(evalPerm(recon, "read")).toBe("allow")
+    expect(evalPerm(recon, "shell")).toBe("allow")
   }),
-)
-
-it.instance("plan agent denies the general subagent by default", () =>
-  Effect.gen(function* () {
-    const plan = yield* load((svc) => svc.get("recon"))
-    expect(plan).toBeDefined()
-    expect(Permission.evaluate("task", "general", plan!.permission).action).toBe("deny")
-    expect(Permission.evaluate("task", "enumerate", plan!.permission).action).toBe("allow")
-    expect(Permission.evaluate("task", "custom", plan!.permission).action).toBe("allow")
-  }),
-)
-
-it.instance(
-  "user permission can allow the general subagent from plan mode",
-  () =>
-    Effect.gen(function* () {
-      const plan = yield* load((svc) => svc.get("recon"))
-      expect(plan).toBeDefined()
-      expect(Permission.evaluate("task", "general", plan!.permission).action).toBe("allow")
-    }),
-  {
-    config: {
-      permission: {
-        task: {
-          general: "allow",
-        },
-      },
-    },
-  },
 )
 
 it.instance("explore agent denies edit and write", () =>
@@ -160,13 +132,14 @@ it.instance(
   },
 )
 
-it.instance("general agent denies todo tools", () =>
+it.instance("enumerate subagent denies tools outside its allowlist", () =>
   Effect.gen(function* () {
-    const general = yield* load((svc) => svc.get("general"))
-    expect(general).toBeDefined()
-    expect(general?.mode).toBe("subagent")
-    expect(general?.hidden).toBeUndefined()
-    expect(evalPerm(general, "todowrite")).toBe("deny")
+    const enumerate = yield* load((svc) => svc.get("enumerate"))
+    expect(enumerate).toBeDefined()
+    expect(enumerate?.mode).toBe("subagent")
+    // Enumerate is deny-by-default with a narrow allowlist, so todowrite is denied.
+    expect(evalPerm(enumerate, "todowrite")).toBe("deny")
+    expect(evalPerm(enumerate, "grep")).toBe("allow")
   }),
 )
 
@@ -214,18 +187,18 @@ it.instance(
   () =>
     Effect.gen(function* () {
       const attack = yield* load((svc) => svc.get("attack"))
-      expect(build).toBeDefined()
-      expect(String(build?.model?.providerID)).toBe("anthropic")
-      expect(String(build?.model?.modelID)).toBe("claude-3")
-      expect(build?.description).toBe("Custom build agent")
-      expect(build?.temperature).toBe(0.7)
-      expect(build?.color).toBe("#FF0000")
-      expect(build?.native).toBe(true)
+      expect(attack).toBeDefined()
+      expect(String(attack?.model?.providerID)).toBe("anthropic")
+      expect(String(attack?.model?.modelID)).toBe("claude-3")
+      expect(attack?.description).toBe("Custom build agent")
+      expect(attack?.temperature).toBe(0.7)
+      expect(attack?.color).toBe("#FF0000")
+      expect(attack?.native).toBe(true)
     }),
   {
     config: {
       agent: {
-        build: {
+        attack: {
           model: "anthropic/claude-3",
           description: "Custom build agent",
           temperature: 0.7,
@@ -249,7 +222,7 @@ it.instance(
   {
     config: {
       agent: {
-        explore: { disable: true },
+        enumerate: { disable: true },
       },
     },
   },
@@ -260,16 +233,16 @@ it.instance(
   () =>
     Effect.gen(function* () {
       const attack = yield* load((svc) => svc.get("attack"))
-      expect(build).toBeDefined()
+      expect(attack).toBeDefined()
       // Specific pattern is denied
       expect(Permission.evaluate("bash", "rm -rf *", attack!.permission).action).toBe("deny")
       // Edit still allowed
-      expect(evalPerm(build, "edit")).toBe("allow")
+      expect(evalPerm(attack, "edit")).toBe("allow")
     }),
   {
     config: {
       agent: {
-        build: {
+        attack: {
           permission: {
             bash: {
               "rm -rf *": "deny",
@@ -286,8 +259,8 @@ it.instance(
   () =>
     Effect.gen(function* () {
       const attack = yield* load((svc) => svc.get("attack"))
-      expect(build).toBeDefined()
-      expect(evalPerm(build, "bash")).toBe("deny")
+      expect(attack).toBeDefined()
+      expect(evalPerm(attack, "bash")).toBe("deny")
     }),
   {
     config: {
@@ -304,14 +277,14 @@ it.instance(
     Effect.gen(function* () {
       const attack = yield* load((svc) => svc.get("attack"))
       const plan = yield* load((svc) => svc.get("recon"))
-      expect(build?.steps).toBe(50)
+      expect(attack?.steps).toBe(50)
       expect(plan?.steps).toBe(100)
     }),
   {
     config: {
       agent: {
-        build: { steps: 50 },
-        plan: { maxSteps: 100 },
+        attack: { steps: 50 },
+        recon: { maxSteps: 100 },
       },
     },
   },
@@ -327,7 +300,7 @@ it.instance(
   {
     config: {
       agent: {
-        explore: { mode: "primary" },
+        enumerate: { mode: "primary" },
       },
     },
   },
@@ -338,12 +311,12 @@ it.instance(
   () =>
     Effect.gen(function* () {
       const attack = yield* load((svc) => svc.get("attack"))
-      expect(build?.name).toBe("Builder")
+      expect(attack?.name).toBe("Builder")
     }),
   {
     config: {
       agent: {
-        build: { name: "Builder" },
+        attack: { name: "Builder" },
       },
     },
   },
@@ -354,12 +327,12 @@ it.instance(
   () =>
     Effect.gen(function* () {
       const attack = yield* load((svc) => svc.get("attack"))
-      expect(build?.prompt).toBe("Custom system prompt")
+      expect(attack?.prompt).toBe("Custom system prompt")
     }),
   {
     config: {
       agent: {
-        build: { prompt: "Custom system prompt" },
+        attack: { prompt: "Custom system prompt" },
       },
     },
   },
@@ -370,13 +343,13 @@ it.instance(
   () =>
     Effect.gen(function* () {
       const attack = yield* load((svc) => svc.get("attack"))
-      expect(build?.options.random_property).toBe("hello")
-      expect(build?.options.another_random).toBe(123)
+      expect(attack?.options.random_property).toBe("hello")
+      expect(attack?.options.another_random).toBe(123)
     }),
   {
     config: {
       agent: {
-        build: {
+        attack: {
           random_property: "hello",
           another_random: 123,
         },
@@ -390,13 +363,13 @@ it.instance(
   () =>
     Effect.gen(function* () {
       const attack = yield* load((svc) => svc.get("attack"))
-      expect(build?.options.custom_option).toBe(true)
-      expect(build?.options.another_option).toBe("value")
+      expect(attack?.options.custom_option).toBe(true)
+      expect(attack?.options.another_option).toBe("value")
     }),
   {
     config: {
       agent: {
-        build: {
+        attack: {
           options: {
             custom_option: true,
             another_option: "value",
@@ -466,18 +439,20 @@ it.instance("Agent.get returns undefined for non-existent agent", () =>
   }),
 )
 
-it.instance("default permission includes doom_loop and external_directory as ask", () =>
+it.instance("attack agent allows doom_loop and external_directory by default", () =>
   Effect.gen(function* () {
     const attack = yield* load((svc) => svc.get("attack"))
-    expect(evalPerm(build, "doom_loop")).toBe("ask")
-    expect(evalPerm(build, "external_directory")).toBe("ask")
+    // The full-engagement agent runs long autonomous loops across the authorized scope,
+    // so these are permissive by default rather than prompting.
+    expect(evalPerm(attack, "doom_loop")).toBe("allow")
+    expect(evalPerm(attack, "external_directory")).toBe("allow")
   }),
 )
 
 it.instance("webfetch is allowed by default", () =>
   Effect.gen(function* () {
     const attack = yield* load((svc) => svc.get("attack"))
-    expect(evalPerm(build, "webfetch")).toBe("allow")
+    expect(evalPerm(attack, "webfetch")).toBe("allow")
   }),
 )
 
@@ -486,13 +461,13 @@ it.instance(
   () =>
     Effect.gen(function* () {
       const attack = yield* load((svc) => svc.get("attack"))
-      expect(evalPerm(build, "bash")).toBe("deny")
-      expect(evalPerm(build, "read")).toBe("deny")
+      expect(evalPerm(attack, "bash")).toBe("deny")
+      expect(evalPerm(attack, "read")).toBe("deny")
     }),
   {
     config: {
       agent: {
-        build: {
+        attack: {
           tools: {
             bash: false,
             read: false,
@@ -508,12 +483,12 @@ it.instance(
   () =>
     Effect.gen(function* () {
       const attack = yield* load((svc) => svc.get("attack"))
-      expect(evalPerm(build, "edit")).toBe("deny")
+      expect(evalPerm(attack, "edit")).toBe("deny")
     }),
   {
     config: {
       agent: {
-        build: {
+        attack: {
           tools: {
             write: false,
           },
@@ -541,13 +516,13 @@ it.instance(
   },
 )
 
-it.instance("global tmp directory children are allowed for external_directory", () =>
+it.instance("attack agent allows external_directory paths including the global tmp directory", () =>
   Effect.gen(function* () {
     const attack = yield* load((svc) => svc.get("attack"))
     expect(
       Permission.evaluate("external_directory", path.join(Global.Path.tmp, "scratch"), attack!.permission).action,
     ).toBe("allow")
-    expect(Permission.evaluate("external_directory", "/some/other/path", attack!.permission).action).toBe("ask")
+    expect(Permission.evaluate("external_directory", "/some/other/path", attack!.permission).action).toBe("allow")
   }),
 )
 
@@ -563,7 +538,7 @@ it.instance(
   {
     config: {
       agent: {
-        build: {
+        attack: {
           permission: {
             external_directory: "deny",
           },
@@ -646,14 +621,14 @@ it.instance(
   },
 )
 
-it.instance("defaultAgent returns build when no default_agent config", () =>
+it.instance("defaultAgent returns attack when no default_agent config", () =>
   Effect.gen(function* () {
     const agent = yield* load((svc) => svc.defaultAgent())
     expect(agent).toBe("attack")
   }),
 )
 
-it.instance("defaultInfo returns resolved build agent when no default_agent config", () =>
+it.instance("defaultInfo returns resolved attack agent when no default_agent config", () =>
   Effect.gen(function* () {
     const agent = yield* load((svc) => svc.defaultInfo())
     expect(agent.name).toBe("attack")
@@ -662,7 +637,7 @@ it.instance("defaultInfo returns resolved build agent when no default_agent conf
 )
 
 it.instance(
-  "defaultAgent respects default_agent config set to plan",
+  "defaultAgent respects default_agent config set to recon",
   () =>
     Effect.gen(function* () {
       const agent = yield* load((svc) => svc.defaultAgent())
@@ -725,17 +700,17 @@ it.instance(
 )
 
 it.instance(
-  "defaultAgent returns plan when build is disabled and default_agent not set",
+  "defaultAgent returns recon when attack is disabled and default_agent not set",
   () =>
     Effect.gen(function* () {
       const agent = yield* load((svc) => svc.defaultAgent())
-      // build is disabled, so it should return plan (next primary agent)
+      // attack is disabled, so it should return recon (next primary agent)
       expect(agent).toBe("recon")
     }),
   {
     config: {
       agent: {
-        build: { disable: true },
+        attack: { disable: true },
       },
     },
   },
@@ -747,8 +722,8 @@ it.instance(
   {
     config: {
       agent: {
-        build: { disable: true },
-        plan: { disable: true },
+        attack: { disable: true },
+        recon: { disable: true },
       },
     },
   },
