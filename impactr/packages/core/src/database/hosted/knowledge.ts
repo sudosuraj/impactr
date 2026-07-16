@@ -3,6 +3,7 @@ export * as HostedKnowledgeGraph from "./knowledge"
 import { Effect } from "effect"
 import { and, eq } from "drizzle-orm"
 import type { EngagementSchema } from "../../engagement/schema"
+import type { FindingRecord } from "../../knowledge/graph"
 import type { SessionSchema } from "../../session/schema"
 import type { HostedDatabase } from "../hosted-database"
 import { HostedGraphNodeTable } from "./pentest-sql"
@@ -32,16 +33,38 @@ export const addFinding = (
     readonly confidenceScore: number
     readonly impactScore: number
   },
-) =>
+): Effect.Effect<FindingRecord> =>
   Effect.gen(function* () {
+    // Engagement-scoped mirror of knowledge/graph.ts's addFinding: dedupe by
+    // fingerprint, but let accumulating evidence raise each score to the better of
+    // the two so a shared engagement's `potential` ranking tracks the best evidence.
     const fingerprint = fingerprintOf(finding.type, finding.data)
     const existing = yield* db
-      .select({ id: HostedGraphNodeTable.id })
+      .select()
       .from(HostedGraphNodeTable)
       .where(and(eq(HostedGraphNodeTable.engagement_id, engagementId), eq(HostedGraphNodeTable.fingerprint, fingerprint)))
       .get()
       .pipe(Effect.orDie)
-    if (existing) return existing.id
+    if (existing) {
+      const novelty = Math.max(existing.novelty_score, finding.noveltyScore)
+      const confidence = Math.max(existing.confidence_score, finding.confidenceScore)
+      const impact = Math.max(existing.impact_score, finding.impactScore)
+      const upgraded =
+        novelty > existing.novelty_score ||
+        confidence > existing.confidence_score ||
+        impact > existing.impact_score
+      if (upgraded)
+        yield* db
+          .update(HostedGraphNodeTable)
+          .set({ novelty_score: novelty, confidence_score: confidence, impact_score: impact })
+          .where(eq(HostedGraphNodeTable.id, existing.id))
+          .pipe(Effect.orDie)
+      return {
+        id: existing.id,
+        status: upgraded ? ("upgraded" as const) : ("duplicate" as const),
+        potential: novelty * impact * confidence,
+      }
+    }
 
     const id = crypto.randomUUID()
     yield* db
@@ -59,7 +82,11 @@ export const addFinding = (
       })
       .pipe(Effect.orDie)
 
-    return id
+    return {
+      id,
+      status: "created" as const,
+      potential: finding.noveltyScore * finding.impactScore * finding.confidenceScore,
+    }
   })
 
 export const getPotentialScore = (db: HostedDatabase.DatabaseShape, findingId: string) =>
