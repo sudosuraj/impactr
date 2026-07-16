@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core"
 import { Timestamps } from "../database/schema.sql"
-import * as DatabasePath from "../database/path"
+import { directoryColumn } from "../database/path"
 import type { EngagementSchema } from "./schema"
 
 /**
@@ -22,7 +22,7 @@ export const EngagementLocalTable = sqliteTable("engagement_local", {
    * only inherits engagements authorized for its own directory, so a scope authorized
    * for one project can't leak into an unrelated session/project on the same machine.
    */
-  directory: DatabasePath.directoryColumn(),
+  directory: directoryColumn(),
   /** Free-text operator attestation captured at authorize time (who/authorization ref). */
   authorized_by: text(),
   authorized_at: integer(),

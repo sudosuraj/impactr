@@ -62,15 +62,13 @@ const layer = Layer.effectDiscard(
                       const local = yield* engagementStore.resolveForSession(context.sessionID as any)
                       if (Option.isSome(local)) {
                         const engagement = local.value
+                        // resolveForSession only ever returns authorized/active engagements,
+                        // so no NOT_ACTIVE_WARNING is needed here (unlike the hosted branch).
                         const target = engagement.scope.target
                         const exclusions =
                           target.exclusions.length > 0 ? target.exclusions.join(", ") : "(none listed)"
-                        const warning =
-                          engagement.status === "active" || engagement.status === "authorized"
-                            ? ""
-                            : NOT_ACTIVE_WARNING(engagement.status)
                         return {
-                          summary: `Authorized scope for "${engagement.name}" (status: ${engagement.status}, operator-authorized local engagement):\nTarget: ${target.name} — ${target.scope}\nExclusions: ${exclusions}${warning}`,
+                          summary: `Authorized scope for "${engagement.name}" (status: ${engagement.status}, operator-authorized local engagement):\nTarget: ${target.name} — ${target.scope}\nExclusions: ${exclusions}`,
                         }
                       }
                       return {

@@ -2,6 +2,7 @@ export * as EngagementStore from "./store"
 
 import { Clock, Context, Effect, Layer, Option } from "effect"
 import { and, desc, eq, inArray } from "drizzle-orm"
+import nodePath from "path"
 import { Database } from "../database/database"
 import { makeGlobalNode } from "../effect/app-node"
 import { Identifier } from "../id/id"
@@ -64,9 +65,25 @@ export const layer = Layer.effect(
     const getRow = (id: EngagementSchema.ID) =>
       db.select().from(EngagementLocalTable).where(eq(EngagementLocalTable.id, id)).get().pipe(Effect.orDie)
 
-    // Scoped to a directory so a session only inherits engagements authorized for its
-    // own project — never the machine-wide newest (which would leak scope across
-    // unrelated sessions/projects).
+    // The directory itself plus every ancestor, so a session inherits an engagement
+    // authorized at its own directory OR at any parent (e.g. the project root the
+    // operator ran `engagement authorize` from). Avoids brittle exact-cwd matching.
+    const ancestorsOf = (directory: string): string[] => {
+      const chain: string[] = []
+      let current = directory
+      while (true) {
+        chain.push(current)
+        const parent = nodePath.dirname(current)
+        if (parent === current) break
+        current = parent
+      }
+      return chain
+    }
+
+    // Scoped to the session's directory (or a parent), so a session only inherits
+    // engagements authorized for its own project — never the machine-wide newest, which
+    // would leak scope across unrelated sessions/projects. Among matches, the most
+    // specific (deepest) authorized directory wins; newest breaks ties.
     const latestAuthorizedForDirectory = (directory: string) =>
       db
         .select()
@@ -74,12 +91,19 @@ export const layer = Layer.effect(
         .where(
           and(
             inArray(EngagementLocalTable.status, ["authorized", "active"] as EngagementSchema.Status[]),
-            eq(EngagementLocalTable.directory, directory),
+            inArray(EngagementLocalTable.directory, ancestorsOf(directory)),
           ),
         )
         .orderBy(desc(EngagementLocalTable.time_created))
-        .get()
-        .pipe(Effect.orDie)
+        .pipe(
+          Effect.orDie,
+          Effect.map((rows) => {
+            let best: typeof EngagementLocalTable.$inferSelect | undefined
+            for (const row of rows)
+              if (!best || (row.directory?.length ?? 0) > (best.directory?.length ?? 0)) best = row
+            return best
+          }),
+        )
 
     return Service.of({
       authorize: (input) =>
@@ -123,14 +147,13 @@ export const layer = Layer.effect(
             .pipe(Effect.orDie)
           if (session?.engagement_id) {
             const bound = yield* getRow(session.engagement_id)
-            // A session explicitly bound to an engagement uses that engagement's authority —
-            // but only while it is still authorized/active. A revoked (or completed/draft)
-            // binding yields no scope rather than leaking the withdrawn scope or silently
-            // switching to a different engagement.
-            if (bound)
-              return bound.status === "authorized" || bound.status === "active"
-                ? Option.some(toLocal(bound))
-                : Option.none()
+            // A session explicitly bound to an engagement is authoritative: use that
+            // engagement while it is authorized/active. If the binding is revoked,
+            // completed/draft, OR missing, this session gets no scope — it never falls
+            // through to a different engagement (which would silently switch scope).
+            return bound && (bound.status === "authorized" || bound.status === "active")
+              ? Option.some(toLocal(bound))
+              : Option.none()
           }
           // Unbound: only inherit an engagement authorized for THIS session's directory,
           // never the machine-wide latest. No directory (shouldn't happen) → no scope.
