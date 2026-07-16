@@ -8,6 +8,7 @@ import { Tool } from "./tool"
 import { Tools } from "./tools"
 import { HostedContext, node as HostedContextNode } from "../session/hosted-context"
 import { HostedEngagement } from "../database/hosted/engagement"
+import { EngagementStore } from "../engagement/store"
 import { PermissionV2 } from "../permission"
 
 export const name = "get_scope"
@@ -29,6 +30,7 @@ const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const tools = yield* Tools.Service
     const hostedContext = yield* HostedContext.Service
+    const engagementStore = yield* EngagementStore.Service
     const permission = yield* PermissionV2.Service
 
     yield* tools
@@ -53,9 +55,27 @@ const layer = Layer.effectDiscard(
                   Effect.gen(function* () {
                     const hosted = yield* hostedContext.resolve(context.sessionID as any)
                     if (Option.isNone(hosted)) {
+                      // No hosted engagement — fall back to an engagement the operator
+                      // explicitly authorized for this machine (via `impactr engagement
+                      // authorize`). This reads a real, persisted, revocable record, not
+                      // an ad-hoc file/env var, so it stays a genuine authorization gate.
+                      const local = yield* engagementStore.resolveForSession(context.sessionID as any)
+                      if (Option.isSome(local)) {
+                        const engagement = local.value
+                        const target = engagement.scope.target
+                        const exclusions =
+                          target.exclusions.length > 0 ? target.exclusions.join(", ") : "(none listed)"
+                        const warning =
+                          engagement.status === "active" || engagement.status === "authorized"
+                            ? ""
+                            : NOT_ACTIVE_WARNING(engagement.status)
+                        return {
+                          summary: `Authorized scope for "${engagement.name}" (status: ${engagement.status}, operator-authorized local engagement):\nTarget: ${target.name} — ${target.scope}\nExclusions: ${exclusions}${warning}`,
+                        }
+                      }
                       return {
                         summary:
-                          "No tracked engagement is configured for this session — there is no centrally authorized scope record to read. Do not assume any target is in scope; confirm authorization with the operator before proceeding.",
+                          "No authorized scope is configured for this session — no tracked hosted engagement and no operator-authorized local engagement. Do not assume any target is in scope; confirm authorization with the operator before proceeding. The operator can authorize a local scope with `impactr engagement authorize --target <t> --scope <s>`.",
                       }
                     }
 
@@ -89,5 +109,5 @@ const layer = Layer.effectDiscard(
 export const node = makeLocationNode({
   name: "tool/get-scope",
   layer,
-  deps: [ToolRegistry.node, PermissionV2.node, HostedContextNode],
+  deps: [ToolRegistry.node, PermissionV2.node, HostedContextNode, EngagementStore.node],
 })
