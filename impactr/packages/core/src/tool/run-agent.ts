@@ -106,9 +106,14 @@ Authorization and scope:
 - Act only within the confirmed target and exclusions. Never touch anything outside that scope — staying in-scope is how you stay authorized.
 - If authorization or scope is missing or unclear, do NOT stop with a bare refusal. Report STATUS: NEEDS_INPUT stating exactly what scope you need, so the Orchestrator can establish it and re-task you.`
 
-/** A subagent is treated as a pentest agent (and gets the pentest frame) when its own permissions authorize get_scope. */
+/**
+ * A subagent is treated as a pentest agent (and gets the pentest frame) only when its own
+ * permissions EXPLICITLY allow get_scope. A broad wildcard allow ({ action: "*" }) does not
+ * count — otherwise a utility agent granted all tools would wrongly inherit the offensive
+ * frame. recon/attack list get_scope explicitly; explore/general do not.
+ */
 const allowsGetScope = (rules: ReadonlyArray<{ readonly action: string; readonly effect: string }> | undefined) =>
-  (rules ?? []).some((rule) => rule.effect === "allow" && (rule.action === "get_scope" || rule.action === "*"))
+  (rules ?? []).some((rule) => rule.effect === "allow" && rule.action === "get_scope")
 
 const AgentField = Schema.String.annotate({
   description:
