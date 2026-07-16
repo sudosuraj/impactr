@@ -3,6 +3,10 @@ import type { DatabaseMigration } from "../migration"
 
 export default {
   id: "20260715120000_add_engagement_local",
+  // Run on fresh installs too: the baseline schema.gen.ts does not contain this table,
+  // and the bootstrap path records non-bootstrap migrations as complete without running
+  // them — so without this flag a fresh database would never create engagement_local.
+  bootstrap: true,
   up(tx) {
     return Effect.gen(function* () {
       yield* tx.run(`

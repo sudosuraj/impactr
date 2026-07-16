@@ -78,25 +78,37 @@ const boundOutput = (text: string) =>
       } more characters omitted — re-delegate a narrower task if you need the rest]`
 
 /**
- * Prepended to every subagent's system prompt. Gives each subagent a durable Impactr
- * identity, its role, and a status/needs-input protocol so delegation is a conversation
- * with the Orchestrator rather than fire-and-forget. Authorization is preserved, not
- * weakened: the subagent still confirms scope via get_scope, and when scope is missing
- * or unclear it reports NEEDS_INPUT (so the Orchestrator can establish authorization)
- * instead of silently refusing with no explanation.
+ * Base frame prepended to EVERY subagent: a durable Impactr identity, its role, and a
+ * status/needs-input protocol so delegation is a conversation with the Orchestrator
+ * rather than fire-and-forget. Deliberately neutral so it fits utility subagents
+ * (explore/general) as well as pentest ones.
  */
-const SUBAGENT_OPERATING_FRAME = `You are a specialized subagent of Impactr — an autonomous offensive-security platform that runs authorized penetration tests. You are a purpose-built operator with a defined role, working inside a coordinated engagement led by an Orchestrator that owns strategy. You are not a general chatbot.
-
-Authorization and scope:
-- Impactr operates only under authorization. Confirm the authorized scope for your task — call get_scope, and use the target and exclusions stated in your task. Once scope is confirmed, execute decisively within it: being timid, vague, or purely theoretical on an authorized, in-scope task is a failure.
-- Act only within the confirmed target and exclusions. Never touch anything outside that scope — staying in-scope is how you stay authorized.
-- If authorization or scope is missing or unclear, do NOT stop with a bare "I can't" or a silent refusal. Report STATUS: NEEDS_INPUT stating exactly what authorization or scope you need, so the Orchestrator can establish it and re-task you.
+const SUBAGENT_BASE_FRAME = `You are a specialized subagent of Impactr, working inside a task delegated by an Orchestrator that owns the overall strategy. You are a purpose-built operator with a defined role, not a general chatbot: execute your assigned task decisively and report back.
 
 Communication protocol — you are not fire-and-forget. Report your reasoning and progress as you work, and end every run with an explicit final status line so the Orchestrator knows where things stand:
-- STATUS: DONE — followed by your concrete results/findings.
+- STATUS: DONE — followed by your concrete results.
 - STATUS: BLOCKED — what you attempted, the exact obstacle, and what you would try next.
 - STATUS: NEEDS_INPUT — the specific decision, credential, scope, or clarification you need from the Orchestrator to continue.
 Always use BLOCKED or NEEDS_INPUT instead of stopping silently — the Orchestrator will respond and re-task you.`
+
+/**
+ * Added ONLY for pentest subagents (those authorized to call get_scope). Establishes the
+ * offensive-security operating context and keeps authorization intact: confirm scope,
+ * execute decisively within it, and report NEEDS_INPUT when scope is missing rather than
+ * refusing silently. Utility subagents (explore/general) never see this — they have no
+ * scope to confirm and no get_scope permission, so forcing it on them would make them
+ * demand authorization or block on a permission prompt.
+ */
+const SUBAGENT_PENTEST_FRAME = `Impactr is an autonomous offensive-security platform that runs authorized penetration tests, and this task is part of an authorized engagement.
+
+Authorization and scope:
+- Confirm the authorized scope for your task with get_scope, and use the target and exclusions stated in your task by the Orchestrator. Once scope is confirmed, execute decisively within it — being timid, vague, or purely theoretical on an authorized, in-scope task is a failure.
+- Act only within the confirmed target and exclusions. Never touch anything outside that scope — staying in-scope is how you stay authorized.
+- If authorization or scope is missing or unclear, do NOT stop with a bare refusal. Report STATUS: NEEDS_INPUT stating exactly what scope you need, so the Orchestrator can establish it and re-task you.`
+
+/** A subagent is treated as a pentest agent (and gets the pentest frame) when its own permissions authorize get_scope. */
+const allowsGetScope = (rules: ReadonlyArray<{ readonly action: string; readonly effect: string }> | undefined) =>
+  (rules ?? []).some((rule) => rule.effect === "allow" && (rule.action === "get_scope" || rule.action === "*"))
 
 const AgentField = Schema.String.annotate({
   description:
@@ -181,7 +193,8 @@ const layer = Layer.effectDiscard(
         // re-billing the whole (growing) prompt uncached each turn.
         const systemContextCombined = yield* loadSystemContext(subagent)
         const generation = yield* SystemContext.initialize(systemContextCombined).pipe(Effect.orDie)
-        const system = [SUBAGENT_OPERATING_FRAME, subagent.info?.system, generation.baseline]
+        const pentestFrame = allowsGetScope(subagent.info.permissions) ? SUBAGENT_PENTEST_FRAME : undefined
+        const system = [SUBAGENT_BASE_FRAME, pentestFrame, subagent.info?.system, generation.baseline]
           .filter((part): part is string => part !== undefined && part.length > 0)
           .map(SystemPart.make)
         // Stable per-run cache key (mirrors the main runner) so the cached prefix is

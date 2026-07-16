@@ -38,6 +38,8 @@ export interface Interface {
   readonly resolveForSession: (sessionID: SessionSchema.ID) => Effect.Effect<Option.Option<LocalEngagement>>
   readonly bindSession: (sessionID: SessionSchema.ID, engagementID: EngagementSchema.ID) => Effect.Effect<void>
   readonly revoke: (id: EngagementSchema.ID) => Effect.Effect<void>
+  /** All local engagements on this machine, newest first — for the operator's `list`/`revoke` view. */
+  readonly list: () => Effect.Effect<LocalEngagement[]>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@impactr-ai/core/engagement/Store") {}
@@ -107,7 +109,14 @@ export const layer = Layer.effect(
             .pipe(Effect.orDie)
           if (session?.engagement_id) {
             const bound = yield* getRow(session.engagement_id)
-            if (bound) return Option.some(toLocal(bound))
+            // A session explicitly bound to an engagement uses that engagement's authority —
+            // but only while it is still authorized/active. A revoked (or completed/draft)
+            // binding yields no scope rather than leaking the withdrawn scope or silently
+            // switching to a different engagement.
+            if (bound)
+              return bound.status === "authorized" || bound.status === "active"
+                ? Option.some(toLocal(bound))
+                : Option.none()
           }
           const latest = yield* latestAuthorized()
           return latest ? Option.some(toLocal(latest)) : Option.none()
@@ -129,6 +138,16 @@ export const layer = Layer.effect(
             .where(eq(EngagementLocalTable.id, id))
             .pipe(Effect.orDie)
         }),
+
+      list: () =>
+        db
+          .select()
+          .from(EngagementLocalTable)
+          .orderBy(desc(EngagementLocalTable.time_created))
+          .pipe(
+            Effect.orDie,
+            Effect.map((rows) => rows.map(toLocal)),
+          ),
     })
   }),
 )

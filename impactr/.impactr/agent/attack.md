@@ -9,6 +9,9 @@ permissions:
   - action: edit
     resource: "*"
     effect: allow
+  - action: get_scope
+    resource: "*"
+    effect: allow
   - action: read
     resource: "*"
     effect: allow
