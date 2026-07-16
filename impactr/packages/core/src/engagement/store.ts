@@ -1,7 +1,7 @@
 export * as EngagementStore from "./store"
 
 import { Clock, Context, Effect, Layer, Option } from "effect"
-import { desc, eq, inArray } from "drizzle-orm"
+import { and, desc, eq, inArray } from "drizzle-orm"
 import { Database } from "../database/database"
 import { makeGlobalNode } from "../effect/app-node"
 import { Identifier } from "../id/id"
@@ -16,6 +16,8 @@ export interface LocalEngagement {
   readonly name: string
   readonly status: EngagementSchema.Status
   readonly scope: EngagementSchema.Scope
+  /** Directory this authorization is scoped to (null for legacy machine-wide records). */
+  readonly directory: string | null
 }
 
 export interface AuthorizeInput {
@@ -23,6 +25,8 @@ export interface AuthorizeInput {
   readonly target: string
   readonly scope: string
   readonly exclusions?: readonly string[]
+  /** The operator's cwd at authorize time — scopes this authorization to its directory. */
+  readonly directory?: string
   /** Free-text operator attestation (who authorized / authorization reference). */
   readonly authorizedBy?: string
 }
@@ -49,6 +53,7 @@ const toLocal = (row: typeof EngagementLocalTable.$inferSelect): LocalEngagement
   name: row.name,
   status: row.status,
   scope: row.scope,
+  directory: row.directory ?? null,
 })
 
 export const layer = Layer.effect(
@@ -59,11 +64,19 @@ export const layer = Layer.effect(
     const getRow = (id: EngagementSchema.ID) =>
       db.select().from(EngagementLocalTable).where(eq(EngagementLocalTable.id, id)).get().pipe(Effect.orDie)
 
-    const latestAuthorized = () =>
+    // Scoped to a directory so a session only inherits engagements authorized for its
+    // own project — never the machine-wide newest (which would leak scope across
+    // unrelated sessions/projects).
+    const latestAuthorizedForDirectory = (directory: string) =>
       db
         .select()
         .from(EngagementLocalTable)
-        .where(inArray(EngagementLocalTable.status, ["authorized", "active"] as EngagementSchema.Status[]))
+        .where(
+          and(
+            inArray(EngagementLocalTable.status, ["authorized", "active"] as EngagementSchema.Status[]),
+            eq(EngagementLocalTable.directory, directory),
+          ),
+        )
         .orderBy(desc(EngagementLocalTable.time_created))
         .get()
         .pipe(Effect.orDie)
@@ -88,13 +101,14 @@ export const layer = Layer.effect(
               name: input.name,
               status,
               scope,
+              directory: input.directory ?? null,
               authorized_by: input.authorizedBy ?? null,
               authorized_at: now,
               time_created: now,
               time_updated: now,
             })
             .pipe(Effect.orDie)
-          return { id, name: input.name, status, scope }
+          return { id, name: input.name, status, scope, directory: input.directory ?? null }
         }),
 
       get: (id) => getRow(id).pipe(Effect.map((row) => (row ? Option.some(toLocal(row)) : Option.none()))),
@@ -102,7 +116,7 @@ export const layer = Layer.effect(
       resolveForSession: (sessionID) =>
         Effect.gen(function* () {
           const session = yield* db
-            .select({ engagement_id: SessionTable.engagement_id })
+            .select({ engagement_id: SessionTable.engagement_id, directory: SessionTable.directory })
             .from(SessionTable)
             .where(eq(SessionTable.id, sessionID))
             .get()
@@ -118,7 +132,10 @@ export const layer = Layer.effect(
                 ? Option.some(toLocal(bound))
                 : Option.none()
           }
-          const latest = yield* latestAuthorized()
+          // Unbound: only inherit an engagement authorized for THIS session's directory,
+          // never the machine-wide latest. No directory (shouldn't happen) → no scope.
+          if (!session?.directory) return Option.none()
+          const latest = yield* latestAuthorizedForDirectory(session.directory)
           return latest ? Option.some(toLocal(latest)) : Option.none()
         }),
 

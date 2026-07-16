@@ -35,7 +35,11 @@ export const EngagementCommand = effectCmd({
         yield* Effect.sync(() =>
           UI.println(
             engagements
-              .map((e) => `${e.id}  [${e.status}]  ${e.name}  —  ${e.scope.target.name} (${e.scope.target.scope})`)
+              .map(
+                (e) =>
+                  `${e.id}  [${e.status}]  ${e.name}  —  ${e.scope.target.name} (${e.scope.target.scope})` +
+                  `  ·  dir: ${e.directory ?? "(any)"}`,
+              )
               .join("\n"),
           ),
         )
@@ -63,6 +67,9 @@ export const EngagementCommand = effectCmd({
         target: args.target,
         scope: args.scope,
         exclusions,
+        // Scope this authorization to the directory it was run from: agents in a
+        // session under this directory inherit it; unrelated projects do not.
+        directory: process.cwd(),
         authorizedBy: args.attestation,
       })
       yield* Effect.sync(() =>

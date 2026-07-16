@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core"
 import { Timestamps } from "../database/schema.sql"
+import * as DatabasePath from "../database/path"
 import type { EngagementSchema } from "./schema"
 
 /**
@@ -15,6 +16,13 @@ export const EngagementLocalTable = sqliteTable("engagement_local", {
   name: text().notNull(),
   status: text().$type<EngagementSchema.Status>().notNull(),
   scope: text({ mode: "json" }).notNull().$type<EngagementSchema.Scope>(),
+  /**
+   * The directory the operator authorized this scope from (their cwd at `engagement
+   * authorize` time), normalized the same way as session.directory. A local session
+   * only inherits engagements authorized for its own directory, so a scope authorized
+   * for one project can't leak into an unrelated session/project on the same machine.
+   */
+  directory: DatabasePath.directoryColumn(),
   /** Free-text operator attestation captured at authorize time (who/authorization ref). */
   authorized_by: text(),
   authorized_at: integer(),

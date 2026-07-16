@@ -19,6 +19,7 @@ export default {
           \`name\` text NOT NULL,
           \`status\` text NOT NULL,
           \`scope\` text NOT NULL,
+          \`directory\` text,
           \`authorized_by\` text,
           \`authorized_at\` integer,
           \`time_created\` integer NOT NULL,
