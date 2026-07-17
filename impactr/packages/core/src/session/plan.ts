@@ -31,6 +31,19 @@ export interface Objective {
   readonly status: ObjectiveStatus
 }
 
+/**
+ * A hierarchical objective spec used to seed the plan from a starting methodology (a playbook).
+ * These are *seeds, not rails*: once inserted they are ordinary objectives the agent reprioritizes,
+ * revises, and extends — a human hacker starts from a mental methodology and adapts it, never from
+ * a blank page.
+ */
+export interface ObjectiveTree {
+  readonly title: string
+  readonly priority: number
+  readonly rationale?: string
+  readonly children?: ReadonlyArray<ObjectiveTree>
+}
+
 export interface Interface {
   /**
    * Add an objective to the plan, optionally under a parent. Deduplicates on
@@ -58,6 +71,13 @@ export interface Interface {
       readonly rationale?: string
     },
   ) => Effect.Effect<boolean>
+
+  /**
+   * Seed the plan from a starting methodology (a playbook): insert a subtree of objectives,
+   * parents before children. Reuses the same dedup as `add`, so seeding an already-seeded plan
+   * sharpens it instead of duplicating. Returns the number of objectives inserted or refreshed.
+   */
+  readonly seed: (sessionId: string, nodes: ReadonlyArray<ObjectiveTree>) => Effect.Effect<number>
 
   /** The full plan, ordered highest-priority first, so callers can render the hierarchy. */
   readonly get: (sessionId: string) => Effect.Effect<ReadonlyArray<Objective>>
@@ -114,49 +134,79 @@ export const layer = Layer.effect(
     const database = yield* Database.Service
     const db = database.db
 
-    return Plan.of({
-      add: (sessionId, objective) =>
-        Effect.gen(function* () {
-          // Dedupe against a live objective with the same parent + title so re-planning the
-          // same intent doesn't grow a forest of identical branches. Terminal objectives
-          // (done/abandoned) don't block a fresh one — the surface may be worth revisiting.
-          const parentMatch = objective.parentId
-            ? eq(PlanObjectiveTable.parent_id, objective.parentId)
-            : isNull(PlanObjectiveTable.parent_id)
-          const existing = yield* db
-            .select()
-            .from(PlanObjectiveTable)
-            .where(and(eq(PlanObjectiveTable.session_id, sessionId as any), parentMatch, eq(PlanObjectiveTable.title, objective.title)))
-            .all()
-            .pipe(Effect.orDie)
-          const live = existing.find((row) => row.status === "pending" || row.status === "active")
-          if (live) {
-            // Re-stating an objective raises its priority to the stronger of the two and
-            // refreshes rationale, so re-planning sharpens focus rather than duplicating.
-            const priority = Math.max(live.priority, objective.priority)
-            yield* db
-              .update(PlanObjectiveTable)
-              .set({ priority, rationale: objective.rationale ?? live.rationale })
-              .where(eq(PlanObjectiveTable.id, live.id))
-              .pipe(Effect.orDie)
-            return live.id
-          }
-
-          const id = crypto.randomUUID()
+    // Shared insert-or-sharpen used by both `add` and `seed`, so seeding a playbook dedupes
+    // exactly the way manual planning does.
+    const addOne = (
+      sessionId: string,
+      objective: {
+        readonly parentId?: string
+        readonly title: string
+        readonly rationale?: string
+        readonly priority: number
+        readonly status?: ObjectiveStatus
+      },
+    ) =>
+      Effect.gen(function* () {
+        // Dedupe against a live objective with the same parent + title so re-planning the
+        // same intent doesn't grow a forest of identical branches. Terminal objectives
+        // (done/abandoned) don't block a fresh one — the surface may be worth revisiting.
+        const parentMatch = objective.parentId
+          ? eq(PlanObjectiveTable.parent_id, objective.parentId)
+          : isNull(PlanObjectiveTable.parent_id)
+        const existing = yield* db
+          .select()
+          .from(PlanObjectiveTable)
+          .where(and(eq(PlanObjectiveTable.session_id, sessionId as any), parentMatch, eq(PlanObjectiveTable.title, objective.title)))
+          .all()
+          .pipe(Effect.orDie)
+        const live = existing.find((row) => row.status === "pending" || row.status === "active")
+        if (live) {
+          // Re-stating an objective raises its priority to the stronger of the two and
+          // refreshes rationale, so re-planning sharpens focus rather than duplicating.
+          const priority = Math.max(live.priority, objective.priority)
           yield* db
-            .insert(PlanObjectiveTable)
-            .values({
-              id,
-              session_id: sessionId as any,
-              parent_id: objective.parentId ?? null,
-              title: objective.title,
-              rationale: objective.rationale ?? null,
-              priority: objective.priority,
-              status: objective.status ?? "pending",
-            })
+            .update(PlanObjectiveTable)
+            .set({ priority, rationale: objective.rationale ?? live.rationale })
+            .where(eq(PlanObjectiveTable.id, live.id))
             .pipe(Effect.orDie)
-          return id
-        }),
+          return live.id
+        }
+
+        const id = crypto.randomUUID()
+        yield* db
+          .insert(PlanObjectiveTable)
+          .values({
+            id,
+            session_id: sessionId as any,
+            parent_id: objective.parentId ?? null,
+            title: objective.title,
+            rationale: objective.rationale ?? null,
+            priority: objective.priority,
+            status: objective.status ?? "pending",
+          })
+          .pipe(Effect.orDie)
+        return id
+      })
+
+    const seedInto = (sessionId: string, parentId: string | undefined, nodes: ReadonlyArray<ObjectiveTree>): Effect.Effect<number> =>
+      Effect.gen(function* () {
+        let count = 0
+        for (const node of nodes) {
+          const id = yield* addOne(sessionId, {
+            parentId,
+            title: node.title,
+            rationale: node.rationale,
+            priority: node.priority,
+          })
+          count += 1 + (yield* seedInto(sessionId, id, node.children ?? []))
+        }
+        return count
+      })
+
+    return Plan.of({
+      add: (sessionId, objective) => addOne(sessionId, objective),
+
+      seed: (sessionId, nodes) => seedInto(sessionId, undefined, nodes),
 
       revise: (sessionId, id, patch) =>
         Effect.gen(function* () {

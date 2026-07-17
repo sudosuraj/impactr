@@ -7,6 +7,7 @@ import { ToolRegistry } from "./registry"
 import { Tool } from "./tool"
 import { Tools } from "./tools"
 import { Plan, node as PlanNode, renderPlan } from "../session/plan"
+import { playbooks, playbookNames, type PlaybookName } from "../session/playbook"
 import { PermissionV2 } from "../permission"
 
 export const name = "attack_plan"
@@ -15,6 +16,7 @@ export const name = "attack_plan"
 const clamp01 = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0)
 
 export const description = `Maintain your plan of attack — the scan hierarchy you build for yourself when you orient on a target and revise as you learn.
+Use "seed" with a playbook (web-app, api, external-network) to lay down a starting methodology for the target type — a prioritized set of objectives you then adapt. Start here once you know what kind of target you have.
 Use "add" to record an objective (optionally under a parent to build the hierarchy), with a priority reflecting where the bugs most likely live and a short rationale for why it matters.
 Use "revise" to move an objective's status (pending → active → done, or abandoned) or reprioritize it as you learn.
 Use "get" to review the current plan before deciding your next move.
@@ -23,7 +25,10 @@ This is your deliberate strategy, distinct from queue_hypothesis (a backlog of c
 const Status = Schema.Literals(["pending", "active", "done", "abandoned"])
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["add", "revise", "get"]).annotate({ description: "The action to perform." }),
+  action: Schema.Literals(["seed", "add", "revise", "get"]).annotate({ description: "The action to perform." }),
+  playbook: Schema.Literals(["web-app", "api", "external-network"]).pipe(Schema.optional).annotate({
+    description: "Starting methodology to seed from (required for 'seed'): 'web-app', 'api', or 'external-network'.",
+  }),
   title: Schema.String.pipe(Schema.optional).annotate({ description: "Objective title (required for 'add')." }),
   parentId: Schema.String.pipe(Schema.optional).annotate({
     description: "Parent objective id to nest under, building the hierarchy (optional for 'add').",
@@ -71,6 +76,18 @@ const layer = Layer.effectDiscard(
                 Effect.andThen(
                   Effect.gen(function* () {
                     switch (input.action) {
+                      case "seed": {
+                        if (!input.playbook)
+                          return {
+                            action: input.action,
+                            summary: `Error: playbook is required to seed. One of: ${playbookNames.join(", ")}.`,
+                          }
+                        const count = yield* plan.seed(context.sessionID, playbooks[input.playbook as PlaybookName])
+                        return {
+                          action: input.action,
+                          summary: `Seeded ${count} objectives from the ${input.playbook} playbook. Review with action 'get', then adapt priorities and add target-specific objectives as you learn.`,
+                        }
+                      }
                       case "add": {
                         if (!input.title)
                           return { action: input.action, summary: "Error: title is required to add an objective." }

@@ -4,6 +4,7 @@ import { Database } from "@impactr-ai/core/database/database"
 import { LayerNode } from "@impactr-ai/core/effect/layer-node"
 import { AppNodeBuilder } from "@impactr-ai/core/effect/app-node-builder"
 import { Plan, node as PlanNode, renderPlan, type Objective } from "@impactr-ai/core/session/plan"
+import { playbooks, playbookNames } from "@impactr-ai/core/session/playbook"
 import { Project } from "@impactr-ai/core/project"
 import { ProjectTable } from "@impactr-ai/core/project/sql"
 import { AbsolutePath } from "@impactr-ai/core/schema"
@@ -90,6 +91,37 @@ describe("Plan", () => {
     }),
   )
 
+  it.effect("seeds a playbook into a prioritized hierarchy", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const plan = yield* Plan
+      const count = yield* plan.seed(sessionID, playbooks["api"])
+      expect(count).toBeGreaterThan(0)
+      const objectives = yield* plan.get(sessionID)
+      expect(objectives).toHaveLength(count)
+      // Top-level objectives exist and the hierarchy is preserved (some objective has a parent).
+      expect(objectives.some((o) => o.parentId === undefined)).toBe(true)
+      expect(objectives.some((o) => o.parentId !== undefined)).toBe(true)
+      // The API playbook must rank object-level authorization (BOLA) as its top objective.
+      const roots = objectives.filter((o) => o.parentId === undefined).sort((a, b) => b.priority - a.priority)
+      expect(roots[0].title).toContain("object-level authorization")
+    }),
+  )
+
+  it.effect("re-seeding sharpens the plan instead of duplicating it", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const plan = yield* Plan
+      const first = yield* plan.seed(sessionID, playbooks["web-app"])
+      const afterFirst = (yield* plan.get(sessionID)).length
+      yield* plan.seed(sessionID, playbooks["web-app"])
+      const afterSecond = (yield* plan.get(sessionID)).length
+      expect(afterFirst).toBe(first)
+      // Seeding the same playbook again dedupes — no growth.
+      expect(afterSecond).toBe(afterFirst)
+    }),
+  )
+
   it.effect("a terminal objective does not block re-planning the same title", () =>
     Effect.gen(function* () {
       yield* setup
@@ -125,5 +157,23 @@ describe("renderPlan", () => {
       { id: "child", parentId: "missing", title: "Orphaned lead", rationale: undefined, priority: 0.4, status: "pending" },
     ]
     expect(renderPlan(objectives)).toContain("○ [0.40] Orphaned lead (id:child)")
+  })
+})
+
+describe("playbooks", () => {
+  test("every playbook has objectives with valid priorities", () => {
+    expect(playbookNames.length).toBeGreaterThan(0)
+    const walk = (nodes: ReadonlyArray<{ priority: number; title: string; children?: ReadonlyArray<any> }>) => {
+      for (const n of nodes) {
+        expect(n.title.length).toBeGreaterThan(0)
+        expect(n.priority).toBeGreaterThanOrEqual(0)
+        expect(n.priority).toBeLessThanOrEqual(1)
+        if (n.children) walk(n.children)
+      }
+    }
+    for (const name of playbookNames) {
+      expect(playbooks[name].length).toBeGreaterThan(0)
+      walk(playbooks[name])
+    }
   })
 })

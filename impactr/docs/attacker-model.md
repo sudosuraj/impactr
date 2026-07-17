@@ -160,9 +160,10 @@ adaptations we're pulling in:
    banners, JS, errors) into its graph and context — so we **treat all target-derived content as
    data, never instructions**, and never let it rewrite the plan.
 5. **Methodology as *seeds*, not rails.** Declarative recon frameworks (Osmedeus/reconFTW/nuclei)
-   prove the value of encoded methodology. We adopt it as **playbook templates that seed the
-   initial Plan** (web-app / API / external-network), which the agent then adapts — proven start,
-   human-like adaptation on top.
+   prove the value of encoded methodology. Adopted: **playbook templates seed the Plan**
+   (`session/playbook.ts`; `attack_plan(action: "seed", playbook: …)` for web-app / API /
+   external-network) with a prioritized objective hierarchy the agent then reprioritizes, prunes,
+   and extends — proven start, human-like adaptation on top. A human never starts from a blank page.
 6. **Objective accuracy measurement.** CyBench / NYU-CTF are the standard harnesses; wiring
    Impactr against them turns "accuracy" from a goal into a measured number.
 
@@ -170,8 +171,9 @@ adaptations we're pulling in:
 
 - **Built:** the mind's core — Attack Graph, Knowledge Graph with evidence accumulation,
   hypothesis queue, saturation, scope gating, and the **Plan / scan-hierarchy** faculty
-  (`attack_plan`), which now **drives the engine loop** — the plan is re-injected as structured
-  memory on every idle-continuation.
+  (`attack_plan`), which now **drives the engine loop** (the plan is re-injected as structured
+  memory on every idle-continuation) and **seeds from playbooks** (web-app / API /
+  external-network methodology the agent adapts).
 - **Next (build order):**
   1. `probe_http` — first technique adapter end-to-end (JSON → normalize → graph → digest),
      proving the "structured state, not transcripts" pattern.
