@@ -130,11 +130,48 @@ orient (seed graph) → attack_plan: write objectives, prioritized by value
         when a lead is proven-worthy → attack agent: verify → draft_vulnerability
 ```
 
+## Grounded in the field — what we adapt
+
+The design above lines up with what current research and tooling have converged on. The
+adaptations we're pulling in:
+
+1. **Context management is the dominant failure mode — not capability.** Studies of LLM pentest
+   agents repeatedly find that models *can* hack but fail on looping, context loss, recency bias,
+   and hallucination (parameter fabrication, tool-output misinterpretation, cross-turn memory
+   corruption); reasoning degrades as a long engagement's transcript accumulates. → Our answer is
+   the hard rule **structured state over transcripts**: the Attack Graph + Plan are durable
+   external memory; the transcript is disposable. The engine now **re-grounds the agent in its
+   own plan on every idle-continuation** (see `session/runner/llm.ts`) so it keeps working its
+   strategy instead of drifting.
+2. **The plan-as-tree is proven (PentestGPT's "Pentesting Task Tree").** A task tree that "encodes
+   the ongoing status and steers subsequent actions" is exactly `attack_plan`; PentestGPT credits
+   it with overcoming memory loss. We adopt two refinements: feed the plan back in natural-language
+   form each cycle (done), and treat **parsing/normalizing noisy tool output into structured
+   summaries** as an explicit step every technique tool routes through (the "digest, not dump"
+   rule, made a first-class faculty when the technique tools land).
+3. **Validate before reporting — the "verification gap."** Leading systems run
+   discover → *validate* → exploit; agents otherwise "execute exploit code but fail to trigger
+   actual vulnerabilities," and can be fooled by honeypots/canary/deceptive services. →
+   `verify_finding` must reproduce-and-prove, plus a **corroboration/skepticism** discipline
+   (a "too easy" finding is a possible honeypot; independent sightings are what raise confidence —
+   which the evidence-accumulation scoring already models).
+4. **Target output is untrusted input.** Memory/prompt-injection research shows agents get
+   hijacked via poisoned retrieved content. Impactr ingests target-controlled text (responses,
+   banners, JS, errors) into its graph and context — so we **treat all target-derived content as
+   data, never instructions**, and never let it rewrite the plan.
+5. **Methodology as *seeds*, not rails.** Declarative recon frameworks (Osmedeus/reconFTW/nuclei)
+   prove the value of encoded methodology. We adopt it as **playbook templates that seed the
+   initial Plan** (web-app / API / external-network), which the agent then adapts — proven start,
+   human-like adaptation on top.
+6. **Objective accuracy measurement.** CyBench / NYU-CTF are the standard harnesses; wiring
+   Impactr against them turns "accuracy" from a goal into a measured number.
+
 ## What's built vs. next
 
 - **Built:** the mind's core — Attack Graph, Knowledge Graph with evidence accumulation,
-  hypothesis queue, saturation, scope gating, and now the **Plan / scan-hierarchy** faculty
-  (`attack_plan`).
+  hypothesis queue, saturation, scope gating, and the **Plan / scan-hierarchy** faculty
+  (`attack_plan`), which now **drives the engine loop** — the plan is re-injected as structured
+  memory on every idle-continuation.
 - **Next (build order):**
   1. `probe_http` — first technique adapter end-to-end (JSON → normalize → graph → digest),
      proving the "structured state, not transcripts" pattern.

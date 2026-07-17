@@ -74,6 +74,40 @@ const toObjective = (row: typeof PlanObjectiveTable.$inferSelect): Objective => 
   status: row.status as ObjectiveStatus,
 })
 
+const MARKER: Record<ObjectiveStatus, string> = { pending: "○", active: "◐", done: "●", abandoned: "✗" }
+
+/**
+ * Render a priority-ordered objective list as an indented hierarchy digest. Shared by the
+ * `attack_plan` tool and the engine's idle-continuation, so the agent always sees its plan in
+ * one consistent form. Returns "" for an empty plan so callers can decide whether to show it.
+ */
+export const renderPlan = (objectives: ReadonlyArray<Objective>): string => {
+  if (objectives.length === 0) return ""
+  const byParent = new Map<string | undefined, Objective[]>()
+  for (const o of objectives) {
+    const list = byParent.get(o.parentId) ?? []
+    list.push(o)
+    byParent.set(o.parentId, list)
+  }
+  const known = new Set(objectives.map((o) => o.id))
+  const lines: string[] = []
+  const line = (o: Objective, depth: number) =>
+    `${"  ".repeat(depth)}${MARKER[o.status]} [${o.priority.toFixed(2)}] ${o.title} (id:${o.id})${
+      o.rationale ? ` — ${o.rationale}` : ""
+    }`
+  const walk = (parentId: string | undefined, depth: number) => {
+    for (const o of byParent.get(parentId) ?? []) {
+      lines.push(line(o, depth))
+      walk(o.id, depth + 1)
+    }
+  }
+  walk(undefined, 0)
+  // Objectives whose parent is missing (e.g. an abandoned parent) still surface at the root so
+  // no objective is silently dropped from the digest.
+  for (const o of objectives) if (o.parentId && !known.has(o.parentId)) lines.push(line(o, 0))
+  return `Plan of attack (○ pending, ◐ active, ● done, ✗ abandoned):\n${lines.join("\n")}`
+}
+
 export const layer = Layer.effect(
   Plan,
   Effect.gen(function* () {

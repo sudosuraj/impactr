@@ -49,6 +49,7 @@ import * as SessionBudget from "../budget"
 import * as KnowledgeSaturation from "../saturation"
 import * as HypothesisQueue from "../hypothesis-queue"
 import * as KnowledgeGraph from "../../knowledge/graph"
+import * as Plan from "../plan"
 
 /**
  * Runs one durable coding-agent Session until it settles.
@@ -122,6 +123,7 @@ const layer = Layer.effect(
     const saturation = yield* KnowledgeSaturation.KnowledgeSaturation
     const hypothesisQueue = yield* HypothesisQueue.HypothesisQueue
     const knowledgeGraph = yield* KnowledgeGraph.KnowledgeGraph
+    const plan = yield* Plan.Plan
     const projectId = location.project.id
     const compaction = SessionCompaction.make({
       events,
@@ -535,12 +537,18 @@ const layer = Layer.effect(
                         return `- [${f.type}] ${shown} (potential ${f.potential.toFixed(2)})`
                       })
                       .join("\n")}`
+              // Feed the current plan of attack back in as structured external memory. Studies of
+              // LLM pentest agents find context loss — not capability — is the dominant failure
+              // mode; re-grounding the agent in its own plan each idle-continuation keeps it
+              // working its strategy instead of drifting or re-deriving it from a decayed transcript.
+              const objectives = yield* plan.get(input.sessionID)
+              const planDigest = objectives.length === 0 ? "" : `\n\n${Plan.renderPlan(objectives)}`
               const messageID = SessionMessage.ID.create()
               yield* SessionInput.admit(db, events, {
                 id: messageID,
                 sessionID: input.sessionID,
                 prompt: Prompt.make({
-                  text: `Exploring hypothesis: ${nextHypothesis.description}${digest}`,
+                  text: `Exploring hypothesis: ${nextHypothesis.description}${digest}${planDigest}`,
                 }),
                 delivery: "queue",
               })
@@ -588,5 +596,6 @@ export const node = makeLocationNode({
     KnowledgeSaturation.node,
     HypothesisQueue.node,
     KnowledgeGraph.node,
+    Plan.node,
   ],
 })

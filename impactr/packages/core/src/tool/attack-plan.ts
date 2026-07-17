@@ -6,7 +6,7 @@ import { makeLocationNode } from "../effect/app-node"
 import { ToolRegistry } from "./registry"
 import { Tool } from "./tool"
 import { Tools } from "./tools"
-import { Plan, node as PlanNode, type Objective, type ObjectiveStatus } from "../session/plan"
+import { Plan, node as PlanNode, renderPlan } from "../session/plan"
 import { PermissionV2 } from "../permission"
 
 export const name = "attack_plan"
@@ -43,36 +43,6 @@ export const Output = Schema.Struct({
   summary: Schema.String,
 })
 export type Output = typeof Output.Type
-
-/** Render the flat, priority-ordered objective list as an indented hierarchy digest. */
-const renderPlan = (objectives: ReadonlyArray<Objective>): string => {
-  if (objectives.length === 0) return "The plan is empty. Add objectives to lay out your approach before diving in."
-  const marker: Record<ObjectiveStatus, string> = { pending: "○", active: "◐", done: "●", abandoned: "✗" }
-  const byParent = new Map<string | undefined, Objective[]>()
-  for (const o of objectives) {
-    const key = o.parentId
-    const list = byParent.get(key) ?? []
-    list.push(o)
-    byParent.set(key, list)
-  }
-  const known = new Set(objectives.map((o) => o.id))
-  const lines: string[] = []
-  const walk = (parentId: string | undefined, depth: number) => {
-    for (const o of byParent.get(parentId) ?? []) {
-      const indent = "  ".repeat(depth)
-      const why = o.rationale ? ` — ${o.rationale}` : ""
-      lines.push(`${indent}${marker[o.status]} [${o.priority.toFixed(2)}] ${o.title} (id:${o.id})${why}`)
-      walk(o.id, depth + 1)
-    }
-  }
-  walk(undefined, 0)
-  // Objectives whose parent is missing (e.g. parent abandoned/pruned) are still shown at root
-  // so no objective is silently dropped from the digest.
-  for (const o of objectives)
-    if (o.parentId && !known.has(o.parentId))
-      lines.push(`${marker[o.status]} [${o.priority.toFixed(2)}] ${o.title} (id:${o.id})${o.rationale ? ` — ${o.rationale}` : ""}`)
-  return `Plan of attack (○ pending, ◐ active, ● done, ✗ abandoned):\n${lines.join("\n")}`
-}
 
 const layer = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -128,7 +98,13 @@ const layer = Layer.effectDiscard(
                       }
                       case "get": {
                         const objectives = yield* plan.get(context.sessionID)
-                        return { action: input.action, summary: renderPlan(objectives) }
+                        return {
+                          action: input.action,
+                          summary:
+                            objectives.length === 0
+                              ? "The plan is empty. Add objectives to lay out your approach before diving in."
+                              : renderPlan(objectives),
+                        }
                       }
                     }
                   }),

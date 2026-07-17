@@ -1,9 +1,9 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 import { Database } from "@impactr-ai/core/database/database"
 import { LayerNode } from "@impactr-ai/core/effect/layer-node"
 import { AppNodeBuilder } from "@impactr-ai/core/effect/app-node-builder"
-import { Plan, node as PlanNode } from "@impactr-ai/core/session/plan"
+import { Plan, node as PlanNode, renderPlan, type Objective } from "@impactr-ai/core/session/plan"
 import { Project } from "@impactr-ai/core/project"
 import { ProjectTable } from "@impactr-ai/core/project/sql"
 import { AbsolutePath } from "@impactr-ai/core/schema"
@@ -102,4 +102,28 @@ describe("Plan", () => {
       expect(objectives).toHaveLength(2)
     }),
   )
+})
+
+describe("renderPlan", () => {
+  // The engine's idle-continuation relies on "" for an empty plan so it can skip injecting it.
+  test("renders an empty plan as the empty string", () => {
+    expect(renderPlan([])).toBe("")
+  })
+
+  test("indents children under their parent", () => {
+    const objectives: Objective[] = [
+      { id: "api", parentId: undefined, title: "Attack the API", rationale: undefined, priority: 0.8, status: "active" },
+      { id: "bola", parentId: "api", title: "Test BOLA", rationale: "top API bug", priority: 0.85, status: "pending" },
+    ]
+    const rendered = renderPlan(objectives)
+    expect(rendered).toContain("◐ [0.80] Attack the API (id:api)")
+    expect(rendered).toContain("  ○ [0.85] Test BOLA (id:bola) — top API bug")
+  })
+
+  test("surfaces an orphaned objective at the root instead of dropping it", () => {
+    const objectives: Objective[] = [
+      { id: "child", parentId: "missing", title: "Orphaned lead", rationale: undefined, priority: 0.4, status: "pending" },
+    ]
+    expect(renderPlan(objectives)).toContain("○ [0.40] Orphaned lead (id:child)")
+  })
 })
