@@ -70,6 +70,12 @@ describe("TechniqueParse", () => {
     ])
   })
 
+  test("arjun attaches discovered params to the endpoint", () => {
+    const parsed = TechniqueParse.arjun('{"https://x/search":{"method":"GET","params":["q","debug"]}}')
+    expect(parsed.assets[0]).toMatchObject({ type: "endpoint", label: "https://x/search" })
+    expect(parsed.assets[0].attributes).toMatchObject({ params: ["q", "debug"], method: "GET" })
+  })
+
   test("javascript extracts endpoints and leaked secrets, skipping static assets", () => {
     const source = `fetch("/api/v1/orders"); const img = "/logo.png"; const key = "AKIAIOSFODNN7EXAMPLE";`
     const parsed = TechniqueParse.javascript(source)
@@ -108,6 +114,27 @@ describe("TechniqueIngest over a real Attack Graph", () => {
       const state = yield* graph.getGraph(sessionID)
       expect(Object.keys(state.nodes)).toContain("ip:1.2.3.4")
       expect(state.edges).toContainEqual({ source: "subdomain:api.example.com", target: "ip:1.2.3.4", relation: "resolves_to", attributes: {} })
+    }),
+  )
+
+  it.effect("re-discovering an asset enriches its attributes instead of overwriting them", () =>
+    Effect.gen(function* () {
+      const { db } = yield* Database.Service
+      yield* db.insert(ProjectTable).values({ id: Project.ID.global, worktree: AbsolutePath.make("/project"), sandboxes: [] }).run().pipe(Effect.orDie)
+      yield* db
+        .insert(SessionTable)
+        .values({ id: sessionID, project_id: Project.ID.global, slug: "tech2", directory: "/project", title: "tech2", version: "test" })
+        .run()
+        .pipe(Effect.orDie)
+      const graph = yield* AttackGraph
+
+      // httpx finds the endpoint with status/title; then mine_parameters attaches params to it.
+      yield* TechniqueIngest.ingest(graph, sessionID, TechniqueParse.httpx('{"url":"https://x/search","status_code":200,"title":"Search"}'))
+      yield* TechniqueIngest.ingest(graph, sessionID, TechniqueParse.arjun('{"https://x/search":{"method":"GET","params":["q"]}}'))
+
+      const node = yield* graph.getNode(sessionID, "endpoint:https://x/search")
+      // Both the original attributes and the newly-mined params are present.
+      expect(node?.attributes).toMatchObject({ status: 200, title: "Search", params: ["q"], method: "GET" })
     }),
   )
 })

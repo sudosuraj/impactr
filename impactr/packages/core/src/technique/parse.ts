@@ -190,6 +190,27 @@ export const openapi = (stdout: string): Parsed => {
   return { assets, relations: [] }
 }
 
+/** arjun `-oJ`: `{ "<url>": { method, params:[…] } }` → endpoints enriched with discovered params. */
+export const arjun = (stdout: string): Parsed => {
+  let doc: Record<string, unknown>
+  try {
+    doc = JSON.parse(stdout)
+  } catch {
+    return empty
+  }
+  const assets: Asset[] = []
+  for (const [url, info] of Object.entries(doc)) {
+    if (!info || typeof info !== "object") continue
+    const params = asStringArray((info as Record<string, unknown>).params)
+    if (params.length === 0) continue
+    const attributes: Record<string, unknown> = { params }
+    const method = asString((info as Record<string, unknown>).method)
+    if (method) attributes.method = method
+    assets.push({ id: endpointId(url), type: "endpoint", label: url, attributes })
+  }
+  return { assets, relations: [] }
+}
+
 // Endpoint-ish strings and common secret patterns extracted from JavaScript source.
 const JS_ENDPOINT = /["'`](\/[a-zA-Z0-9_?&=/.-]{2,}|https?:\/\/[^"'`\s]+)["'`]/g
 const JS_SECRETS: ReadonlyArray<readonly [string, RegExp]> = [

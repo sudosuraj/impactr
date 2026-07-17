@@ -96,7 +96,10 @@ a **compact digest**, not the raw dump → scope-gated, rate-aware, idempotent.
 
 **Built** (`src/technique/` + `src/tool/technique.ts`): the Phase-1/2 discovery cluster on one
 shared scaffold — `enumerate_subdomains`, `resolve_dns`, `scan_ports`, `probe_http`, `crawl_site`,
-`harvest_urls`, `discover_content`, `discover_api_spec`, `analyze_javascript`. Each is just
+`harvest_urls`, `discover_content`, `discover_api_spec`, `analyze_javascript`, `mine_parameters`.
+Re-discovering an asset **enriches** its graph node (merges new attributes) rather than
+overwriting, so `mine_parameters` attaching params to an endpoint httpx already found sharpens the
+map. Each is just
 `{engine, argv, parser}`; the parsers (`technique/parse.ts`) are pure and fixture-tested, ingestion
 (`technique/ingest.ts`) upserts into the graph with dedup. The engine shell-out is graceful (a
 missing binary yields an advisory digest, not a crash), and because output becomes typed nodes

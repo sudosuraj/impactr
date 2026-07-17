@@ -103,6 +103,13 @@ const SPECS: ReadonlyArray<Spec> = [
     buildArgs: (t) => ["-s", "-L", "--max-time", "30", t],
     parse: TechniqueParse.javascript,
   },
+  {
+    name: "mine_parameters",
+    engine: "arjun",
+    description: "Discover hidden/unlinked request parameters on an endpoint, enriching it in the graph. Target: a URL.",
+    buildArgs: (t) => ["-u", t, "-oJ", "/dev/stdout", "-q"],
+    parse: TechniqueParse.arjun,
+  },
 ]
 
 export const Input = Schema.Struct({
