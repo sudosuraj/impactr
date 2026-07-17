@@ -167,8 +167,11 @@ adaptations we're pulling in:
    (`session/playbook.ts`; `attack_plan(action: "seed", playbook: …)` for web-app / API /
    external-network) with a prioritized objective hierarchy the agent then reprioritizes, prunes,
    and extends — proven start, human-like adaptation on top. A human never starts from a blank page.
-6. **Objective accuracy measurement.** CyBench / NYU-CTF are the standard harnesses; wiring
-   Impactr against them turns "accuracy" from a goal into a measured number.
+6. **Objective accuracy measurement.** Adopted: an **evaluation harness** (`src/eval/harness.ts`;
+   see docs/evaluation.md) scores an engagement's recorded findings against a case's expected
+   findings with weighted **partial credit** (pass/fail hides multi-step progress). Pure and
+   tested end-to-end against a real Knowledge Graph; a benchmark adapter maps CyBench / NYU-CTF
+   challenges to eval cases. Turns "accuracy" from a goal into a measured number.
 
 ## What's built vs. next
 
