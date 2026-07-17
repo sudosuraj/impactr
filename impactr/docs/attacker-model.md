@@ -40,8 +40,11 @@ These are Impactr's faculties, in the order a mind uses them. Each maps to a con
 6. **Hypothesize → test → learn** `[built]` — guess how it breaks, test cheaply, update belief as
    evidence sharpens. → evidence accumulation in the Knowledge Graph (re-recording upgrades scores,
    never resets them).
-7. **Chain** `[next]` — combine small findings into big impact (SSRF→metadata→cloud-creds;
-   IDOR→user-enum→mass-extract). Where humans beat scanners. → `detect_chains` over graph edges.
+7. **Chain** `[built]` — combine small findings into big impact (SSRF→metadata→cloud-creds;
+   IDOR→user-enum→mass-extract). Where humans beat scanners, and the headline differentiator of
+   the strongest platforms in the field. → the orchestrator walks the Attack Graph's edges and
+   composes chains as an explicit behavior (its prompt), **not** a separate tool — chaining is
+   reasoning over state we already store, so it stays lean.
 8. **Prove** `[next]` — never call it a bug until you've seen it fire. → verification tools.
 9. **Know when to stop** `[built]` — recognize diminishing returns instead of grinding. →
    saturation (counts only genuine new discovery, so re-scanning can't fake progress).
@@ -83,9 +86,11 @@ the JS is where the endpoints are; brute-forcing is a waste there).
 | `record_discovery` | Log a normalized finding with novelty/impact/confidence scoring. | built |
 | `queue_hypothesis` | Park a concrete side-lead for later. | built |
 | `draft_vulnerability` | Write the structured, reproducible report. | built |
-| `triage_candidates` | Cluster/dedupe raw scanner hits into a ranked shortlist. | next |
-| `detect_chains` | Graph traversal that spots multi-step exploit chains. | next |
-| `lookup_intel` | Given a tech+version or bug class, return known CVEs / exploits / techniques. | next |
+> Deliberately **not** built as tools: triage, chain-detection, and CVE/intel lookup. These are
+> *judgment the orchestrator already performs* over the graph it can read (chaining is now an
+> explicit orchestrator behavior) plus `websearch`/`webfetch` for intel — turning them into tools
+> would add selection overhead for no new ability. Benchmark research is clear that the strongest
+> agents carry the *fewest, most general* tools, so we keep the action space lean.
 
 ### Techniques (the work tools — each wraps a proven engine, normalizes to the graph)
 
@@ -183,6 +188,14 @@ adaptations we're pulling in:
    findings with weighted **partial credit** (pass/fail hides multi-step progress). Pure and
    tested end-to-end against a real Knowledge Graph; a benchmark adapter maps CyBench / NYU-CTF
    challenges to eval cases. Turns "accuracy" from a goal into a measured number.
+7. **Fewest, most general tools win — keep bash first-class.** Benchmark research (and the
+   strongest commercial platforms) find that agents with a small, general toolset outperform ones
+   with sprawling structured toolkits: many tools burn reasoning budget on tool selection, and
+   `bash` is maximally composable. We resolve the tension with **general execution + structured
+   memory**: `bash` stays the default hammer, the technique tools are *optional accelerators* that
+   normalize into the Attack Graph (fixing shell-first's weakness — context/state decay), and we
+   don't grow the toolkit past distinct techniques. This is why triage/chaining/intel are behaviors,
+   not tools.
 
 ## What's built vs. next
 
