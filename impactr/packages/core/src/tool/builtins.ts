@@ -21,6 +21,7 @@ import { RunAgentTool } from "./run-agent"
 import { RepoCloneTool } from "./repo-clone"
 import { DraftVulnerabilityTool } from "./draft-vulnerability"
 import { AttackGraphTool } from "./attack-graph"
+import { AttackPlanTool } from "./attack-plan"
 import { GetScopeTool } from "./get-scope"
 
 /**
@@ -59,6 +60,7 @@ export const node = makeLocationNode({
     RepoCloneTool.node,
     DraftVulnerabilityTool.node,
     AttackGraphTool.node,
+    AttackPlanTool.node,
     GetScopeTool.node,
   ],
 })

@@ -1,0 +1,147 @@
+# Impactr as an autonomous attacker — the cognitive model
+
+> How Impactr should think and work: like an individual human hacker, not a machine running a
+> fixed pipeline. This document defines the *mind* (the cognitive loop), the *hands* (a lean,
+> non-overlapping toolkit), and the principle that keeps them coherent.
+
+## The core idea: a mind, not a pipeline
+
+A pipeline runs the same steps in the same order every time. A hacker does not. **The
+intelligence is in the *choosing* — what to look at, what's interesting, what to do next — not
+in the *running* of tools.** So Impactr is built as a mind with hands, not as an automation
+pipeline:
+
+- **The hands** are a small set of distinct *techniques* (tools).
+- **The mind** is the Attack Graph (its model of the target) plus the judgment loop that decides
+  the next move.
+- **The workflow is a loop, not a line** — it bends around what the target actually is.
+
+Handed a target, Impactr does **not** run every tool on every asset. It sizes the target up,
+writes its own prioritized plan, and works that plan adaptively — exactly as a human would.
+
+## The cognitive loop (a hacker's psychology)
+
+These are Impactr's faculties, in the order a mind uses them. Each maps to a concrete mechanism;
+`[built]` already exists, `[next]` is upcoming.
+
+1. **Orient** `[partial]` — "What *is* this target, what's it built with, what does it *do*, where's
+   the value?" Form a first impression and a mental map. → seeds the **Attack Graph**.
+2. **Plan its own attack** `[built]` — from that impression, write a *prioritized hierarchy of
+   objectives* (the "scan hierarchy"): go to the login, the upload, the `/api`, the admin panel
+   first; ignore the marketing pages. → the **`attack_plan`** tool + `session/plan.ts`.
+3. **Prioritize by value & instinct** `[built]` — attention is a budget. Weight custom/sensitive
+   surface far above boilerplate. → objective `priority` in the plan; finding `potential`
+   (`novelty × impact × confidence`) in the Knowledge Graph.
+4. **Choose the next technique adaptively** `[partial]` — react to signal (found an API → think
+   auth/IDOR; found an upload → think RCE). Never a fixed order. → orchestrator judgment over the
+   plan + graph; sharpens as the technique tools land.
+5. **Follow curiosity, but bounded** `[built]` — chase the interesting thread, keep a "come back
+   to this" list, don't fall down endless holes. → **`queue_hypothesis`**.
+6. **Hypothesize → test → learn** `[built]` — guess how it breaks, test cheaply, update belief as
+   evidence sharpens. → evidence accumulation in the Knowledge Graph (re-recording upgrades scores,
+   never resets them).
+7. **Chain** `[next]` — combine small findings into big impact (SSRF→metadata→cloud-creds;
+   IDOR→user-enum→mass-extract). Where humans beat scanners. → `detect_chains` over graph edges.
+8. **Prove** `[next]` — never call it a bug until you've seen it fire. → verification tools.
+9. **Know when to stop** `[built]` — recognize diminishing returns instead of grinding. →
+   saturation (counts only genuine new discovery, so re-scanning can't fake progress).
+
+The distinctive faculty that turns "AI running tools" into "a hacker working a target" is
+**Orient + Plan (1–2)** — Impactr writing and revising its *own* strategy. That is now built
+(`attack_plan`); the technique tools (below) are the hands that execute it.
+
+## The plan is not the hypothesis queue
+
+These are complementary faculties, deliberately **not** duplicates:
+
+| | **Plan** (`attack_plan`) | **Hypothesis queue** (`queue_hypothesis`) |
+|---|---|---|
+| Shape | A **tree** of objectives (parent/child hierarchy) | A **flat** priority queue |
+| Origin | **Top-down** — deliberate strategy | **Bottom-up** — leads spotted mid-work |
+| Lifecycle | **Revised** across the whole engagement | **Popped once** when an agent goes idle |
+| Answers | "What is my approach, and in what order?" | "What concrete lead should I not forget?" |
+
+## The hands: a lean, non-overlapping toolkit
+
+**The rule: one tool = one distinct kind of work and one distinct source of signal. No two tools
+produce the same thing by the same means — and the mind *chooses* which technique to deploy
+rather than running them all.** That second half is the line between intelligence and a pipeline.
+
+A subtlety this rule does *not* violate: finding endpoints by **crawling**, by **archives**, by
+**brute-forcing**, and by **reading JavaScript** are not duplicates — they reach different parts
+of the surface (linked-now / linked-once / unlinked-but-guessable / revealed-by-client-code). A
+human treats those as four separate instincts and picks the ones that fit the target (heavy SPA →
+the JS is where the endpoints are; brute-forcing is a waste there).
+
+### State & judgment (the mind's own tools)
+
+| Tool | Intent | Status |
+|---|---|---|
+| `get_scope` | Confirm authorized targets/exclusions before any action. | built |
+| `attack_plan` | Write and revise the plan of attack (the scan hierarchy). | built |
+| `attack_graph` | Read/write the structured map of assets, relationships, and status. | built |
+| `record_discovery` | Log a normalized finding with novelty/impact/confidence scoring. | built |
+| `queue_hypothesis` | Park a concrete side-lead for later. | built |
+| `draft_vulnerability` | Write the structured, reproducible report. | built |
+| `triage_candidates` | Cluster/dedupe raw scanner hits into a ranked shortlist. | next |
+| `detect_chains` | Graph traversal that spots multi-step exploit chains. | next |
+| `lookup_intel` | Given a tech+version or bug class, return known CVEs / exploits / techniques. | next |
+
+### Techniques (the work tools — each wraps a proven engine, normalizes to the graph)
+
+Every technique tool: typed *target* input → hidden proven engine(s) → normalize into the
+existing Attack Graph asset schema (`ip`/`port`/`subdomain`/`endpoint`/`credential`/`vulnerability`
++ `resolves_to`/`hosts`/`exposes`/`uses`/`vulnerable_to`) → persist with dedup + scoring → return
+a **compact digest**, not the raw dump → scope-gated, rate-aware, idempotent.
+
+| Tool | Distinct signal it provides |
+|---|---|
+| `enumerate_subdomains` | Names that exist under a root domain (passive + active). |
+| `resolve_dns` | Resolution + wildcard/takeover-prone records. |
+| `scan_ports` | Open ports and their service/version banners. |
+| `probe_http` | HTTP liveness, status/title/redirects/TLS/headers **and** tech fingerprint (one place — no separate fingerprint tool). |
+| `crawl_site` | Endpoints reachable by following the live app. |
+| `harvest_urls` | Endpoints that were linked once (archives) but are gone now. |
+| `discover_content` | Unlinked-but-guessable paths (backups, `.git`, `.env`, admin). |
+| `analyze_javascript` | Hidden API routes, params, and secrets revealed by client code. |
+| `mine_parameters` | Unlinked request parameters on a known endpoint. |
+| `discover_api_spec` | OpenAPI/Swagger/GraphQL schema → every operation and parameter. |
+| `scan_vulnerabilities` | Template/signature *candidates* (recon-safe; never exploits). |
+| `enrich_cve` | Known CVEs + public exploits for a fingerprinted tech+version. |
+| `verify_finding` | Reproduces one candidate and captures proof (upgrades its scores). |
+| `test_injection` | Focused injection probing on one parameter/endpoint. |
+| `test_access_control` | BOLA/IDOR, privilege-escalation, mass-assignment (top API bugs). |
+| `capture_evidence` | Screenshot / response / reproducible PoC artifact for the report. |
+
+> Note the consolidation: tech fingerprinting lives **inside** `probe_http` rather than as a
+> separate `fingerprint_tech` tool — same work, so one tool.
+
+## How it runs (loop, not line)
+
+```
+orient (seed graph) → attack_plan: write objectives, prioritized by value
+   └─ loop until saturated or scope exhausted:
+        attack_plan(get) → pick highest-priority pending objective
+          → choose the ONE technique that fits it (not all of them)
+             → delegate to recon/attack subagent
+                → record_discovery / attack_graph  (normalize results)
+                   → attack_plan(revise + add)      (learn: update strategy)
+                   → queue_hypothesis(side-leads)   (curiosity, bounded)
+        when a lead is proven-worthy → attack agent: verify → draft_vulnerability
+```
+
+## What's built vs. next
+
+- **Built:** the mind's core — Attack Graph, Knowledge Graph with evidence accumulation,
+  hypothesis queue, saturation, scope gating, and now the **Plan / scan-hierarchy** faculty
+  (`attack_plan`).
+- **Next (build order):**
+  1. `probe_http` — first technique adapter end-to-end (JSON → normalize → graph → digest),
+     proving the "structured state, not transcripts" pattern.
+  2. Phase-1 techniques (`enumerate_subdomains`, `resolve_dns`, `scan_ports`).
+  3. Content/interface techniques (`crawl_site`, `harvest_urls`, `discover_content`,
+     `analyze_javascript`, `mine_parameters`, `discover_api_spec`).
+  4. Candidacy + judgment (`scan_vulnerabilities`, `enrich_cve`, `triage_candidates`,
+     `detect_chains`, `lookup_intel`).
+  5. Verification/exploitation (`verify_finding`, `test_injection`, `test_access_control`,
+     `capture_evidence`).
