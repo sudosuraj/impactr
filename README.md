@@ -1,7 +1,7 @@
 # Impactr
 
-Impactr is an **autonomous AI penetration-testing agent**. It is built on a fork of the
-[opencode](https://github.com/sst/opencode) agent runtime, re-purposed so that instead of writing
+Impactr is an **autonomous AI penetration-testing agent**. It is built on a forked
+general-purpose agent runtime, re-purposed so that instead of writing
 application code it maps attack surface, forms and tests hypotheses, and drafts professional
 vulnerability reports.
 
@@ -31,7 +31,7 @@ rate falls below a threshold) or the session **budget** is exhausted.
 
 | Path | Purpose |
 |---|---|
-| `impactr/` | The Impactr application (opencode fork). Core runtime lives in `impactr/packages/core`. |
+| `impactr/` | The Impactr application. Core runtime lives in `impactr/packages/core`. |
 | `.agents/` | Human-readable reference definitions of the pentesting agents and the recon playbook. |
 | `impactr/.impactr/agent/` | The agent definitions the runtime actually loads (`orchestrator`, `recon`, `attack`). |
 
