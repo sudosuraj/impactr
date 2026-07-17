@@ -11,6 +11,7 @@ import { LocationMutation } from "../location-mutation"
 import { AppProcess } from "../process"
 import { PermissionV2 } from "../permission"
 import { PositiveInt } from "../schema"
+import { UntrustedContent } from "../util/untrusted"
 import { ToolRegistry } from "./registry"
 import { Tool } from "./tool"
 import { Tools } from "./tools"
@@ -112,7 +113,10 @@ const layer = Layer.effectDiscard(
             ...(output.timeout === undefined ? {} : { timeout: output.timeout }),
           }),
           toModelOutput: ({ output }) => [
-            { type: "text", text: output.output },
+            // The command's output is target-controlled (recon/attack tools run through bash),
+            // so fence it as untrusted data the agent must not obey. The metadata line below is
+            // tool-authored and stays outside the fence.
+            { type: "text", text: UntrustedContent.fence("bash", output.output) },
             { type: "text", text: modelOutput(output) },
           ],
           execute: (input, context) =>

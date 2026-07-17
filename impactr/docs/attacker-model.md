@@ -157,8 +157,11 @@ adaptations we're pulling in:
    which the evidence-accumulation scoring already models).
 4. **Target output is untrusted input.** Memory/prompt-injection research shows agents get
    hijacked via poisoned retrieved content. Impactr ingests target-controlled text (responses,
-   banners, JS, errors) into its graph and context — so we **treat all target-derived content as
-   data, never instructions**, and never let it rewrite the plan.
+   banners, JS, errors) into its context. Adopted: **untrusted-content fencing**
+   (`util/untrusted.ts`) wraps target-controlled tool output (`bash`, `webfetch`) in an
+   unforgeable boundary — the boundary token is stripped from the content so a target can't close
+   the fence early — and each agent is told once to **treat fenced content as data, never
+   instructions**, so an injected page or banner can't rewrite the plan or scope.
 5. **Methodology as *seeds*, not rails.** Declarative recon frameworks (Osmedeus/reconFTW/nuclei)
    prove the value of encoded methodology. Adopted: **playbook templates seed the Plan**
    (`session/playbook.ts`; `attack_plan(action: "seed", playbook: …)` for web-app / API /

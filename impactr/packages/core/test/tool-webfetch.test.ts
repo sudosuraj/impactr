@@ -10,8 +10,13 @@ import { SessionV2 } from "@impactr-ai/core/session"
 import { ToolRegistry } from "@impactr-ai/core/tool/registry"
 import { WebFetchTool } from "@impactr-ai/core/tool/webfetch"
 import { ToolOutputStore } from "@impactr-ai/core/tool-output-store"
+import { UntrustedContent } from "@impactr-ai/core/util/untrusted"
 import { testEffect } from "./lib/effect"
 import { toolIdentity, executeTool, settleTool, toolDefinitions } from "./lib/tool"
+
+// Fetched web content is target-controlled, so the tool fences it as untrusted data before it
+// reaches the model. Model-facing result/content carry the fence; the raw `structured.output` does not.
+const fetched = (raw: string) => UntrustedContent.fence("webfetch", raw)
 
 const sessionID = SessionV2.ID.make("ses_webfetch_test")
 const requests: Array<{ readonly url: string; readonly headers: Record<string, string> }> = []
@@ -84,10 +89,10 @@ describe("WebFetchTool registration", () => {
 
       expect((yield* toolDefinitions(registry)).map((tool) => tool.name)).toEqual(["webfetch"])
       expect(yield* settleTool(registry, call({ url, format: "text", timeout: 4 }))).toEqual({
-        result: { type: "text", value: "hello" },
+        result: { type: "text", value: fetched("hello") },
         output: {
           structured: { url, contentType: "text/plain", format: "text", output: "hello" },
-          content: [{ type: "text", text: "hello" }],
+          content: [{ type: "text", text: fetched("hello") }],
         },
       })
       expect(assertions).toMatchObject([
@@ -105,7 +110,7 @@ describe("WebFetchTool registration", () => {
 
       expect(yield* executeTool(registry, call({ url, format: "text" }))).toEqual({
         type: "text",
-        value: "hello",
+        value: fetched("hello"),
       })
       expect(assertions).toMatchObject([
         { sessionID, action: "webfetch", resources: [url], save: ["*"], metadata: { url, format: "text" } },
@@ -133,7 +138,7 @@ describe("WebFetchTool registration", () => {
 
           expect(yield* executeTool(registry, call({ url, format: "text" }))).toEqual({
             type: "text",
-            value: "redirected",
+            value: fetched("redirected"),
           })
           expect(assertions).toMatchObject([
             { sessionID, action: "webfetch", resources: [url], save: ["*"], metadata: { url, format: "text" } },
@@ -170,11 +175,11 @@ describe("WebFetchTool registration", () => {
 
       expect(yield* executeTool(registry, call({ url: "https://1.1.1.1", format: "markdown" }))).toEqual({
         type: "text",
-        value: "# Hello\n\nworld",
+        value: fetched("# Hello\n\nworld"),
       })
       expect(yield* executeTool(registry, call({ url: "https://1.1.1.1", format: "text" }))).toEqual({
         type: "text",
-        value: "Helloworld",
+        value: fetched("Helloworld"),
       })
     }),
   )
@@ -256,7 +261,7 @@ describe("WebFetchTool registration", () => {
 
       expect(yield* executeTool(registry, call({ url: "https://1.1.1.1", format: "text" }))).toEqual({
         type: "text",
-        value: "ok",
+        value: fetched("ok"),
       })
       expect(requests).toHaveLength(2)
       expect(requests[0]?.headers["user-agent"]).toContain("Mozilla/5.0")

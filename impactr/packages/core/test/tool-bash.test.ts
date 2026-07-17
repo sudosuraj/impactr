@@ -19,8 +19,13 @@ import { ToolRegistry } from "@impactr-ai/core/tool/registry"
 import { ToolOutputStore } from "@impactr-ai/core/tool-output-store"
 import { location } from "./fixture/location"
 import { tmpdir } from "./fixture/tmpdir"
+import { UntrustedContent } from "@impactr-ai/core/util/untrusted"
 import { testEffect } from "./lib/effect"
 import { toolIdentity, executeTool, settleTool, toolDefinitions } from "./lib/tool"
+
+// Command output is target-controlled (recon/attack tools run through bash), so the tool fences it
+// as untrusted data in the model-facing output. The trailing metadata line stays outside the fence.
+const commandOutput = (raw: string) => UntrustedContent.fence("bash", raw)
 
 const sessionID = SessionV2.ID.make("ses_bash_tool_test")
 const assertions: PermissionV2.AssertInput[] = []
@@ -152,7 +157,7 @@ describe("BashTool", () => {
               result: {
                 type: "content",
                 value: [
-                  { type: "text", text: "hello\n" },
+                  { type: "text", text: commandOutput("hello\n") },
                   { type: "text", text: "Command exited with code 0." },
                 ],
               },
@@ -162,7 +167,7 @@ describe("BashTool", () => {
                   truncated: false,
                 },
                 content: [
-                  { type: "text", text: "hello\n" },
+                  { type: "text", text: commandOutput("hello\n") },
                   { type: "text", text: "Command exited with code 0." },
                 ],
               },
@@ -243,7 +248,7 @@ describe("BashTool", () => {
                 expect(settled.result).toEqual({
                   type: "content",
                   value: [
-                    { type: "text", text: "core-bash" },
+                    { type: "text", text: commandOutput("core-bash") },
                     { type: "text", text: "Command exited with code 0." },
                   ],
                 })
@@ -360,7 +365,7 @@ describe("BashTool", () => {
                 exit: 7,
                 truncated: false,
               })
-              expect(settled.output?.content[0]).toEqual({ type: "text", text: "HEAD full output TAIL" })
+              expect(settled.output?.content[0]).toEqual({ type: "text", text: commandOutput("HEAD full output TAIL") })
             }),
           ),
         )
