@@ -94,6 +94,14 @@ existing Attack Graph asset schema (`ip`/`port`/`subdomain`/`endpoint`/`credenti
 + `resolves_to`/`hosts`/`exposes`/`uses`/`vulnerable_to`) → persist with dedup + scoring → return
 a **compact digest**, not the raw dump → scope-gated, rate-aware, idempotent.
 
+**Built** (`src/technique/` + `src/tool/technique.ts`): the Phase-1/2 discovery cluster on one
+shared scaffold — `enumerate_subdomains`, `resolve_dns`, `scan_ports`, `probe_http`, `crawl_site`,
+`harvest_urls`, `discover_content`, `discover_api_spec`, `analyze_javascript`. Each is just
+`{engine, argv, parser}`; the parsers (`technique/parse.ts`) are pure and fixture-tested, ingestion
+(`technique/ingest.ts`) upserts into the graph with dedup. The engine shell-out is graceful (a
+missing binary yields an advisory digest, not a crash), and because output becomes typed nodes
+rather than echoed text, these tools are **injection-safe by construction**.
+
 | Tool | Distinct signal it provides |
 |---|---|
 | `enumerate_subdomains` | Names that exist under a root domain (passive + active). |
