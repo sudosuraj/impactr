@@ -32,7 +32,9 @@ import { Config } from "@/config/config"
 import { type ToolContext as PluginToolContext, type ToolDefinition } from "@impactr-ai/plugin"
 import type { JSONSchema7, JSONSchema7Definition } from "@ai-sdk/provider"
 import { Schema } from "effect"
-import * as AttackGraph from "@/attack-graph"
+import { node as AttackGraphNode } from "@impactr-ai/core/attack-graph/graph"
+import { AppProcess } from "@impactr-ai/core/process"
+import { techniqueSpecs, makeTechnique } from "./technique"
 import * as BrowserManager from "@/browser"
 import z from "zod"
 import { Plugin } from "../plugin"
@@ -124,6 +126,9 @@ const layer = Layer.effect(
     const recordDiscovery = yield* RecordDiscoveryTool
     const queueHypothesis = yield* QueueHypothesisTool
     const browserTool = yield* BrowserTool
+    // Technique tools: proven engines whose output normalizes into the same session Attack Graph.
+    const techniqueDefs = yield* Effect.all(techniqueSpecs.map(makeTechnique))
+    const techniqueTools = yield* Effect.all(techniqueDefs.map((def) => Tool.init(def)))
 
     const agent = yield* Agent.Service
 
@@ -267,6 +272,7 @@ const layer = Layer.effect(
             tool.attack_plan,
             tool.record_discovery,
             tool.queue_hypothesis,
+            ...techniqueTools,
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
             ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
           ],
@@ -451,7 +457,8 @@ export const node = LayerNode.make({
     RuntimeFlags.node,
     Database.node,
     Ripgrep.node,
-    AttackGraph.node,
+    AttackGraphNode,
+    AppProcess.node,
     PlanNode,
     KnowledgeGraphNode,
     KnowledgeSaturationNode,
