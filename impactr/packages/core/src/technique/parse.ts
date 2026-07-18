@@ -139,18 +139,31 @@ export const urlList = (stdout: string): Parsed => {
   return { assets: [...urls].map((url) => ({ id: endpointId(url), type: "endpoint", label: url, attributes: { source: "archive" } })), relations: [] }
 }
 
-/** ffuf `-json`: `{results:[{url, status, length}]}` → endpoint assets. */
+const ffufResult = (r: Record<string, unknown>): Asset | undefined => {
+  const url = asString(r.url)
+  if (!url) return undefined
+  const attributes: Record<string, unknown> = { source: "content-discovery" }
+  if (r.status !== undefined) attributes.status = r.status
+  if (r.length !== undefined) attributes.length = r.length
+  return { id: endpointId(url), type: "endpoint", label: url, attributes }
+}
+
+/**
+ * ffuf → endpoint assets. Handles both output shapes: `-json` emits one JSONL result row per hit
+ * (`{url, status, length}`), while `-of json` writes a wrapper object `{results:[…]}`.
+ */
 export const ffuf = (stdout: string): Parsed => {
   const assets: Asset[] = []
   for (const row of jsonl(stdout)) {
-    const results = Array.isArray(row.results) ? (row.results as Array<Record<string, unknown>>) : []
-    for (const r of results) {
-      const url = asString(r.url)
-      if (!url) continue
-      const attributes: Record<string, unknown> = { source: "content-discovery" }
-      if (r.status !== undefined) attributes.status = r.status
-      if (r.length !== undefined) attributes.length = r.length
-      assets.push({ id: endpointId(url), type: "endpoint", label: url, attributes })
+    if (Array.isArray(row.results)) {
+      for (const r of row.results as Array<Record<string, unknown>>) {
+        const asset = ffufResult(r)
+        if (asset) assets.push(asset)
+      }
+    } else {
+      // A bare JSONL row is itself a result.
+      const asset = ffufResult(row)
+      if (asset) assets.push(asset)
     }
   }
   return { assets, relations: [] }

@@ -53,10 +53,13 @@ describe("TechniqueParse", () => {
     expect(archived.assets[0].attributes).toMatchObject({ source: "archive" })
   })
 
-  test("ffuf extracts discovered paths from its results array", () => {
-    const parsed = TechniqueParse.ffuf('{"results":[{"url":"https://x/admin","status":200,"length":42}]}')
-    expect(parsed.assets[0]).toMatchObject({ type: "endpoint", label: "https://x/admin" })
-    expect(parsed.assets[0].attributes).toMatchObject({ status: 200, source: "content-discovery" })
+  test("ffuf extracts discovered paths from both the results wrapper and JSONL rows", () => {
+    const wrapper = TechniqueParse.ffuf('{"results":[{"url":"https://x/admin","status":200,"length":42}]}')
+    expect(wrapper.assets[0]).toMatchObject({ type: "endpoint", label: "https://x/admin" })
+    expect(wrapper.assets[0].attributes).toMatchObject({ status: 200, source: "content-discovery" })
+    // ffuf -json emits one JSONL result row per hit (no wrapper object).
+    const jsonl = TechniqueParse.ffuf('{"url":"https://x/backup","status":200,"length":10}\n{"url":"https://x/.git","status":403}')
+    expect(jsonl.assets.map((a) => a.label).sort()).toEqual(["https://x/.git", "https://x/backup"])
   })
 
   test("openapi expands paths and methods into endpoints", () => {
@@ -114,6 +117,32 @@ describe("TechniqueIngest over a real Attack Graph", () => {
       const state = yield* graph.getGraph(sessionID)
       expect(Object.keys(state.nodes)).toContain("ip:1.2.3.4")
       expect(state.edges).toContainEqual({ source: "subdomain:api.example.com", target: "ip:1.2.3.4", relation: "resolves_to", attributes: {} })
+    }),
+  )
+
+  it.effect("counts duplicate ids within one batch once (no new-vs-known miscount)", () =>
+    Effect.gen(function* () {
+      const { db } = yield* Database.Service
+      yield* db.insert(ProjectTable).values({ id: Project.ID.global, worktree: AbsolutePath.make("/project"), sandboxes: [] }).run().pipe(Effect.orDie)
+      yield* db
+        .insert(SessionTable)
+        .values({ id: sessionID, project_id: Project.ID.global, slug: "tech3", directory: "/project", title: "tech3", version: "test" })
+        .run()
+        .pipe(Effect.orDie)
+      const graph = yield* AttackGraph
+
+      // A secret matched twice in one JS file yields two assets with the same id.
+      const result = yield* TechniqueIngest.ingest(graph, sessionID, {
+        assets: [
+          { id: "credential:AKIA...", type: "credential", label: "aws key" },
+          { id: "credential:AKIA...", type: "credential", label: "aws key" },
+        ],
+        relations: [],
+      })
+      // Deduped to one unique asset, counted as one new — not "1 new, 1 known".
+      expect(result.assets).toBe(1)
+      expect(result.created).toBe(1)
+      expect(result.digest).toContain("1 new, 0 already known")
     }),
   )
 
