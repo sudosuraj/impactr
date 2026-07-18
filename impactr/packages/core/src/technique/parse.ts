@@ -74,15 +74,21 @@ export const dnsx = (stdout: string): Parsed => {
   return { assets: [...assets.values()], relations }
 }
 
-/** naabu `-json` `{host|ip, port}`, or plain `host:port` lines → ip + port assets, exposes edges. */
+const isIpv4 = (host: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(host)
+
+/** naabu `-json` `{host|ip, port}`, or plain `host:port` lines → ip/subdomain + port assets, exposes edges. */
 export const naabu = (stdout: string): Parsed => {
   const assets = new Map<string, Asset>()
   const relations: Relation[] = []
   const add = (host: string, port: number | string) => {
-    assets.set(ipId(host), { id: ipId(host), type: "ip", label: host })
+    // A naabu target may be a hostname, not an IP; don't mislabel it as an ip node.
+    const hostAsset: Asset = isIpv4(host)
+      ? { id: ipId(host), type: "ip", label: host }
+      : { id: subdomainId(host), type: "subdomain", label: host }
+    assets.set(hostAsset.id, hostAsset)
     const pid = portId(host, port)
     assets.set(pid, { id: pid, type: "port", label: `${host}:${port}`, attributes: { port: Number(port) } })
-    relations.push({ source: ipId(host), target: pid, relation: "exposes" })
+    relations.push({ source: hostAsset.id, target: pid, relation: "exposes" })
   }
   for (const row of jsonl(stdout)) {
     const host = asString(row.ip) ?? asString(row.host)

@@ -158,6 +158,17 @@ describe("renderPlan", () => {
     ]
     expect(renderPlan(objectives)).toContain("○ [0.40] Orphaned lead (id:child)")
   })
+
+  test("renders the whole subtree under an orphaned parent, not just the orphan", () => {
+    // An objective nested under an orphan (bogus parentId) must not vanish from the digest.
+    const objectives: Objective[] = [
+      { id: "orphan", parentId: "missing", title: "Orphan root", rationale: undefined, priority: 0.5, status: "pending" },
+      { id: "grandchild", parentId: "orphan", title: "Nested under orphan", rationale: undefined, priority: 0.6, status: "pending" },
+    ]
+    const rendered = renderPlan(objectives)
+    expect(rendered).toContain("Orphan root (id:orphan)")
+    expect(rendered).toContain("Nested under orphan (id:grandchild)")
+  })
 })
 
 describe("playbooks", () => {

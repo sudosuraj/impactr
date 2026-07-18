@@ -122,9 +122,13 @@ export const renderPlan = (objectives: ReadonlyArray<Objective>): string => {
     }
   }
   walk(undefined, 0)
-  // Objectives whose parent is missing (e.g. an abandoned parent) still surface at the root so
+  // Objectives whose parent id points at nothing (e.g. a bogus parentId passed to attack_plan,
+  // which has no SQL foreign key) are orphan roots. Surface each such orphan AND its whole subtree
+  // — walking from the missing parent id renders the orphans and recurses into their children — so
   // no objective is silently dropped from the digest.
-  for (const o of objectives) if (o.parentId && !known.has(o.parentId)) lines.push(line(o, 0))
+  const missingParents = new Set<string>()
+  for (const o of objectives) if (o.parentId && !known.has(o.parentId)) missingParents.add(o.parentId)
+  for (const parentId of missingParents) walk(parentId, 0)
   return `Plan of attack (○ pending, ◐ active, ● done, ✗ abandoned):\n${lines.join("\n")}`
 }
 

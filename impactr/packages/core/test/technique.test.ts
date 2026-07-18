@@ -33,6 +33,10 @@ describe("TechniqueParse", () => {
     expect(json.relations).toContainEqual({ source: "ip:1.2.3.4", target: "port:1.2.3.4:443", relation: "exposes" })
     const plain = TechniqueParse.naabu("5.6.7.8:22")
     expect(plain.assets.some((a) => a.id === "port:5.6.7.8:22")).toBe(true)
+    // A hostname target is typed as a subdomain, not mislabeled as an ip node.
+    const hostname = TechniqueParse.naabu("api.example.com:443")
+    expect(hostname.assets.find((a) => a.label === "api.example.com")).toMatchObject({ type: "subdomain" })
+    expect(hostname.assets.some((a) => a.id === "ip:api.example.com")).toBe(false)
   })
 
   test("httpx captures status, title, tech and links to its host", () => {
