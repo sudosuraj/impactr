@@ -84,7 +84,7 @@ top of this one, not part of this design.
 
 **`session.engagement_id`** — new **nullable** FK added to the existing `session` table
 (`packages/core/src/session/sql.ts`). Nullable because the leftover, not-yet-decommissioned
-opencode coding-assistant sessions (issue #14, p2-later) have no engagement. Pentest sessions get
+general coding-assistant sessions (issue #14, p2-later) have no engagement. Pentest sessions get
 this set when the orchestrator starts an engagement.
 
 **`asm_asset`** (shape only, consumed by issue #7's dashboard view) — recon output, not yet

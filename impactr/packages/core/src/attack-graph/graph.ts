@@ -58,12 +58,17 @@ export const layer = Layer.effect(
             // Re-discovering a known node is a loop signal; count it so the
             // orchestrator can detect when it is stuck circling one asset.
             const loopCount = existing.loop_count + 1
+            // Enrich, don't overwrite: merge newly-observed attributes into the node so a later
+            // technique (e.g. mine_parameters adding params to an endpoint httpx already found)
+            // sharpens the graph. New keys win on conflict; status is left untouched so a
+            // re-discovery can never regress a compromised node back to pending.
+            const attributes = { ...existing.attributes, ...nodeInfo.attributes }
             yield* db
               .update(AttackGraphNodeTable)
-              .set({ loop_count: loopCount })
+              .set({ loop_count: loopCount, attributes })
               .where(and(eq(AttackGraphNodeTable.session_id, sessionId as any), eq(AttackGraphNodeTable.id, nodeInfo.id)))
               .pipe(Effect.orDie)
-            return toNode({ ...existing, loop_count: loopCount })
+            return toNode({ ...existing, loop_count: loopCount, attributes })
           }
           const node: Node = { ...nodeInfo, discoveredAt: Date.now(), loopCount: 0 }
           yield* db

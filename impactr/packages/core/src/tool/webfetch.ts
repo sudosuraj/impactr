@@ -9,6 +9,7 @@ import { makeLocationNode } from "../effect/app-node"
 import { LayerNodePlatform } from "../effect/app-node-platform"
 import { PermissionV2 } from "../permission"
 import { collectBoundedResponseBody } from "./http-body"
+import { UntrustedContent } from "../util/untrusted"
 import { ToolRegistry } from "./registry"
 import { Tool } from "./tool"
 import { Tools } from "./tools"
@@ -127,7 +128,9 @@ const layer = Layer.effectDiscard(
           description,
           input: Input,
           output: Output,
-          toModelOutput: ({ output }) => [{ type: "text", text: output.output }],
+          // Fetched web content is remote and target-controlled; fence it as untrusted data so an
+          // injected page can't hijack the agent.
+          toModelOutput: ({ output }) => [{ type: "text", text: UntrustedContent.fence("webfetch", output.output) }],
           execute: (input, context) =>
             Effect.gen(function* () {
               yield* Effect.try({

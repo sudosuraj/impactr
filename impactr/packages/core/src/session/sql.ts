@@ -200,3 +200,36 @@ export const HypothesisQueueTable = sqliteTable(
     index("hypothesis_queue_session_status_priority_idx").on(table.session_id, table.status, table.priority),
   ],
 )
+
+// The engagement's plan of attack — the "scan hierarchy" Impactr writes and revises
+// for itself, top-down, as it orients on a target. Distinct from hypothesis_queue:
+// this is a persisted *tree* of deliberate objectives (parent_id forms the hierarchy)
+// that is revised over the engagement, whereas the hypothesis queue is a flat backlog
+// of concrete leads popped once when an agent goes idle.
+export const PlanObjectiveTable = sqliteTable(
+  "plan_objective",
+  {
+    id: text().primaryKey(),
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    // Self-reference forms the objective tree; null for a top-level objective. Not a SQL
+    // foreign key so an objective can be inserted before its parent without ordering constraints.
+    parent_id: text(),
+    title: text().notNull(),
+    // Why this objective matters — the hacker's reasoning, surfaced back into context.
+    rationale: text(),
+    // Value-weighted attention in [0,1]: where a human's nose says the bugs live.
+    priority: real().notNull(),
+    // pending | active | done | abandoned
+    status: text().notNull().default("pending"),
+    ...Timestamps,
+  },
+  (table) => [
+    index("plan_objective_session_idx").on(table.session_id),
+    index("plan_objective_parent_idx").on(table.parent_id),
+    // Serves the ordered plan digest: WHERE session_id = ? ORDER BY priority DESC.
+    index("plan_objective_session_priority_idx").on(table.session_id, table.priority),
+  ],
+)

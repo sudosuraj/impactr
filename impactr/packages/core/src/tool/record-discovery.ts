@@ -31,11 +31,21 @@ export const Input = Schema.Struct({
 
 export const Output = Schema.Struct({
   findingId: Schema.String,
+  status: Schema.Literals(["created", "upgraded", "duplicate"]),
+  potential: Schema.Number,
 })
 export type Output = typeof Output.Type
 
-export const toModelOutput = (findingId: string) => {
-  return `Discovery recorded successfully with ID: ${findingId}.`
+export const toModelOutput = (output: Output) => {
+  const potential = `potential ${output.potential.toFixed(2)} (novelty × impact × confidence)`
+  switch (output.status) {
+    case "created":
+      return `New discovery recorded with ID: ${output.findingId} — ${potential}.`
+    case "upgraded":
+      return `Existing finding ${output.findingId} upgraded with stronger evidence — ${potential}.`
+    case "duplicate":
+      return `Already known: finding ${output.findingId} was recorded before with no stronger evidence (${potential}). Pursue a different lead rather than re-recording this.`
+  }
 }
 
 const layer = Layer.effectDiscard(
@@ -53,7 +63,7 @@ const layer = Layer.effectDiscard(
           input: Input,
           output: Output,
           toModelOutput: ({ output }) => [
-            { type: "text", text: toModelOutput(output.findingId) },
+            { type: "text", text: toModelOutput(output) },
           ],
           execute: (input, context) =>
             permission
@@ -87,8 +97,19 @@ const layer = Layer.effectDiscard(
                     ),
                   ),
                 ),
-                Effect.tap(() => saturation.recordFinding(context.sessionID).pipe(Effect.orDie)),
-                Effect.map((findingId) => ({ findingId: findingId as string })),
+                // Only genuine progress drives the saturation signal. Re-recording a
+                // finding that carries no stronger evidence is not a discovery, so it
+                // must not keep the Continuous Discovery Engine running on stale ground.
+                Effect.tap((record) =>
+                  record.status === "duplicate"
+                    ? Effect.void
+                    : saturation.recordFinding(context.sessionID).pipe(Effect.orDie),
+                ),
+                Effect.map((record) => ({
+                  findingId: record.id,
+                  status: record.status,
+                  potential: record.potential,
+                })),
               ),
         }),
       })

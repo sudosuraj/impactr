@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Impactr is an **autonomous AI penetration-testing agent**, built on a fork of the
-[opencode](https://github.com/sst/opencode) agent runtime (re-purposed for offensive security instead of
+Impactr is an **autonomous AI penetration-testing agent**, built on a forked
+general-purpose agent runtime (re-purposed for offensive security instead of
 coding). The fork lives entirely under `impactr/`; almost all real work happens there.
 
 Repository layout (this git root):
 
 | Path | Purpose |
 |---|---|
-| `impactr/` | The Impactr application (opencode fork). All builds, tests, and typechecking happen inside this directory. |
+| `impactr/` | The Impactr application. All builds, tests, and typechecking happen inside this directory. |
 | `.agents/` | Human-readable reference copies of the pentesting agent definitions and the recon playbook skill (`.agents/skills/recon-playbook/SKILL.md`). Not what the runtime actually loads. |
 | `impactr/.impactr/agent/*.md` | The agent definitions the runtime actually loads (frontmatter + prompt), including `orchestrator`, `recon`, `attack`. |
 
@@ -54,10 +54,10 @@ After changing the public Protocol or Server `HttpApi`, run `bun run generate` f
 
 ### Pentesting domain layer (packages/core)
 
-This is what makes the fork different from upstream opencode. It lives in `packages/core/src/`:
+This is what makes Impactr different from the general-purpose runtime it forked. It lives in `packages/core/src/`:
 
 - **`attack-graph/`** — per-session graph of discovered assets/relationships and exploitation state (nodes + edges), persisted to SQLite so it survives restarts within an engagement. Exposed to agents via the `attack_graph` tool (`src/tool/attack-graph.ts`).
-- **`knowledge/`** — the Knowledge Graph of findings. Each finding is scored `noveltyScore × impactScore × confidenceScore = potential`, which drives what gets explored next. Findings are deduped by a stable content fingerprint (sorted-key JSON hash) so repeated recordings within a session collapse. Exposed via `record_discovery` (`src/tool/record-discovery.ts`).
+- **`knowledge/`** — the Knowledge Graph of findings. Each finding is scored `noveltyScore × impactScore × confidenceScore = potential`, which drives what gets explored next. Findings are deduped by a stable content fingerprint (sorted-key JSON hash), but evidence accumulates: re-recording a known finding raises each score to the per-dimension max (monotonic, never a downgrade), so `potential` tracks the strongest evidence rather than freezing at the first sighting. `addFinding` reports the outcome as `created` / `upgraded` / `duplicate`; only `created` and `upgraded` (genuine progress) feed the saturation signal, so re-scanning the same assets can't mask saturation. Exposed via `record_discovery` (`src/tool/record-discovery.ts`).
 - **`src/tool/queue-hypothesis.ts`** — queues a follow-up worth investigating later instead of derailing the current task; the engine pops the highest-`potential` hypothesis when an agent would otherwise go idle.
 - **`src/tool/draft-vulnerability.ts`** — writes structured Markdown vulnerability reports into `findings/`.
 
@@ -73,7 +73,7 @@ Three agents, defined twice — once as a human-readable reference (`.agents/*/a
 
 ### Session runtime
 
-The rest of `packages/core` (`src/session`, `src/system-context`, `src/agent`, etc.) is the general opencode-derived agent runtime — durable session history, System Context assembly, tool registry, permissions. The terminology and invariants for this layer (Context Epoch, Session Drain, Mid-Conversation System Message, the public `HttpApi`/Client/SDK contract, etc.) are precisely defined in `impactr/CONTEXT.md`; read it before touching session/context code, since the terms there are used exactly and are easy to get subtly wrong.
+The rest of `packages/core` (`src/session`, `src/system-context`, `src/agent`, etc.) is the general upstream-derived agent runtime — durable session history, System Context assembly, tool registry, permissions. The terminology and invariants for this layer (Context Epoch, Session Drain, Mid-Conversation System Message, the public `HttpApi`/Client/SDK contract, etc.) are precisely defined in `impactr/CONTEXT.md`; read it before touching session/context code, since the terms there are used exactly and are easy to get subtly wrong.
 
 ## Conventions (full detail in `impactr/AGENTS.md`)
 
