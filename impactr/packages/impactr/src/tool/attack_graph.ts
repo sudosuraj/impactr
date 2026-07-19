@@ -52,8 +52,8 @@ export const AttackGraphTool = Tool.define(
 
       if (action === "update_status") {
         if (!nodeId || !nodeStatus) return "Error: nodeId and nodeStatus are required to update a node."
-        yield* graph.updateNodeStatus(sid, nodeId, nodeStatus as NodeStatus)
-        return `Node ${nodeId} status updated to ${nodeStatus}.`
+        const node = yield* graph.updateNodeStatus(sid, nodeId, nodeStatus as NodeStatus)
+        return node ? `Node ${nodeId} status updated to ${nodeStatus}.` : `Node ${nodeId} not found.`
       }
 
       if (action === "get_node") {
