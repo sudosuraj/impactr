@@ -14,6 +14,10 @@ import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_ENUMERATE from "./prompt/enumerate.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
+import PROMPT_ORCHESTRATOR from "./prompt/orchestrator.txt"
+import PROMPT_RECON from "./prompt/recon.txt"
+import PROMPT_EXPLOIT from "./prompt/exploit.txt"
+import PROMPT_REPORT from "./prompt/report.txt"
 import { Permission } from "@/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@impactr-ai/core/global"
@@ -141,6 +145,7 @@ const layer = Layer.effect(
           attack: {
             name: "attack",
             description: "Full engagement agent. Runs the complete pentest lifecycle.",
+            prompt: PROMPT_ORCHESTRATOR,
             options: {},
             permission: Permission.merge(
               defaults,
@@ -162,6 +167,7 @@ const layer = Layer.effect(
           recon: {
             name: "recon",
             description: "Reconnaissance only. Maps attack surface, identifies technologies. Does not exploit.",
+            prompt: PROMPT_RECON,
             options: {},
             permission: Permission.merge(
               defaults,
@@ -190,6 +196,20 @@ const layer = Layer.effect(
                 shell: "allow",
                 webfetch: "allow",
                 read: "allow",
+                // Structured enumeration: the technique tools and the shared graph/knowledge stores.
+                attack_graph: "allow",
+                record_discovery: "allow",
+                queue_hypothesis: "allow",
+                enumerate_subdomains: "allow",
+                resolve_dns: "allow",
+                scan_ports: "allow",
+                probe_http: "allow",
+                crawl_site: "allow",
+                harvest_urls: "allow",
+                discover_content: "allow",
+                discover_api_spec: "allow",
+                analyze_javascript: "allow",
+                mine_parameters: "allow",
                 external_directory: readonlyExternalDirectory,
               }),
               user,
@@ -203,6 +223,7 @@ const layer = Layer.effect(
           exploit: {
             name: "exploit",
             description: `Use strictly for deep-dive exploitation of a specific discovered vulnerability. Spawned by attack. Do NOT use for reporting.`,
+            prompt: PROMPT_EXPLOIT,
             permission: Permission.merge(
               defaults,
               Permission.fromConfig({
@@ -221,12 +242,15 @@ const layer = Layer.effect(
           report: {
             name: "report",
             description: `Use strictly for producing the final structured vulnerability pentest report from session findings. Do NOT use for active scanning or exploitation.`,
+            prompt: PROMPT_REPORT,
             permission: Permission.merge(
               defaults,
               Permission.fromConfig({
                 "*": "deny",
                 edit: "allow",
                 read: "allow",
+                // The report writer reads confirmed findings from the shared attack graph.
+                attack_graph: "allow",
                 external_directory: "allow"
               }),
               user,

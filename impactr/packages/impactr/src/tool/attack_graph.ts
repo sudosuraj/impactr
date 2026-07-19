@@ -1,7 +1,9 @@
 import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
-import * as AttackGraph from "@/attack-graph"
-import { NodeType, NodeStatus, EdgeRelation } from "@/attack-graph/schema"
+import { AttackGraph } from "@impactr-ai/core/attack-graph/graph"
+import type { NodeType, NodeStatus, EdgeRelation } from "@impactr-ai/core/attack-graph/schema"
+import { Session } from "@/session/session"
+import { engagementRoot } from "./engagement-session"
 
 export const Parameters = Schema.Struct({
   action: Schema.Literals(["add_node", "add_edge", "update_status", "query", "get_node"]).annotate({ description: "The action to perform." }),
@@ -18,14 +20,16 @@ export const Parameters = Schema.Struct({
 export const AttackGraphTool = Tool.define(
   "attack_graph",
   Effect.gen(function* () {
-    const graph = yield* AttackGraph.Service
+    const graph = yield* AttackGraph
+    const sessions = yield* Session.Service
     return {
-    description: "Interact with the global Attack Graph. You can add nodes (targets, findings), add edges (relationships), update node status, or query the graph to understand your current pentesting state.",
+    description: "Interact with the session's Attack Graph — your persistent map of discovered assets and their state. Add nodes (targets, findings), add edges (relationships), update node status, or query the graph to understand your current pentesting state. The technique tools also populate this graph, so it is the single shared source of truth.",
     parameters: Parameters,
     execute: ({ action, nodeId, nodeType, nodeLabel, nodeAttributes, nodeStatus, source, target, relation }, ctx) => Effect.gen(function* () {
+      const sid = yield* engagementRoot(sessions, ctx.sessionID as string)
       if (action === "add_node") {
         if (!nodeId || !nodeType || !nodeLabel || !nodeStatus) return "Error: nodeId, nodeType, nodeLabel, and nodeStatus are required to add a node."
-        const node = yield* graph.addNode({
+        const node = yield* graph.addNode(sid, {
           id: nodeId,
           type: nodeType as NodeType,
           label: nodeLabel,
@@ -37,7 +41,7 @@ export const AttackGraphTool = Tool.define(
 
       if (action === "add_edge") {
         if (!source || !target || !relation) return "Error: source, target, and relation are required to add an edge."
-        yield* graph.addEdge({
+        yield* graph.addEdge(sid, {
           source,
           target,
           relation: relation as EdgeRelation,
@@ -48,21 +52,31 @@ export const AttackGraphTool = Tool.define(
 
       if (action === "update_status") {
         if (!nodeId || !nodeStatus) return "Error: nodeId and nodeStatus are required to update a node."
-        const node = yield* graph.updateNodeStatus(nodeId, nodeStatus as NodeStatus)
-        return `Node ${nodeId} status updated to ${nodeStatus}.`
+        const node = yield* graph.updateNodeStatus(sid, nodeId, nodeStatus as NodeStatus)
+        return node ? `Node ${nodeId} status updated to ${nodeStatus}.` : `Node ${nodeId} not found.`
       }
 
       if (action === "get_node") {
         if (!nodeId) return "Error: nodeId is required."
-        const node = yield* graph.getNode(nodeId)
+        const node = yield* graph.getNode(sid, nodeId)
         if (!node) return `Node ${nodeId} not found.`
-        const neighbors = yield* graph.getNeighbors(nodeId)
+        const neighbors = yield* graph.getNeighbors(sid, nodeId)
         return `Node Info:\n${JSON.stringify(node, null, 2)}\n\nNeighbors:\n${JSON.stringify(neighbors.map(n => n.id), null, 2)}`
       }
 
       if (action === "query") {
-        const state = yield* graph.getGraph()
-        return `Attack Graph Summary:\nTotal Nodes: ${Object.keys(state.nodes).length}\nTotal Edges: ${state.edges.length}\n\nNodes:\n${JSON.stringify(state.nodes, null, 2)}\n\nEdges:\n${JSON.stringify(state.edges, null, 2)}`
+        const state = yield* graph.getGraph(sid)
+        const nodes = Object.values(state.nodes)
+        const byStatus = nodes.reduce<Record<string, number>>((acc, n) => {
+          acc[n.status] = (acc[n.status] ?? 0) + 1
+          return acc
+        }, {})
+        const statusLine = Object.entries(byStatus).map(([s, c]) => `${s}: ${c}`).join(", ")
+        const list = (label: string, ids: string[]) =>
+          ids.length === 0 ? "" : `\n${label}:\n${ids.slice(0, 20).map((id) => `- ${id}`).join("\n")}${ids.length > 20 ? `\n… and ${ids.length - 20} more` : ""}`
+        const compromised = nodes.filter((n) => n.status === "compromised").map((n) => n.id)
+        const active = nodes.filter((n) => n.status === "enumerating" || n.status === "exploiting").map((n) => n.id)
+        return `Attack Graph Summary:\nTotal Nodes: ${nodes.length} | Total Edges: ${state.edges.length}\nStatus: ${statusLine || "none"}${list("Compromised", compromised)}${list("Active", active)}\n\n(Use get_node <id> for a node's full detail and neighbors.)`
       }
 
       return "Unknown action."
