@@ -2,6 +2,8 @@ import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
 import { HypothesisQueue } from "@impactr-ai/core/session/hypothesis-queue"
 import { KnowledgeGraph } from "@impactr-ai/core/knowledge/graph"
+import { Session } from "@/session/session"
+import { engagementRoot } from "./engagement-session"
 
 const clamp01 = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0)
 
@@ -16,13 +18,15 @@ export const QueueHypothesisTool = Tool.define(
   Effect.gen(function* () {
     const queue = yield* HypothesisQueue
     const graph = yield* KnowledgeGraph
+    const sessions = yield* Session.Service
     return {
       description: `Queue a follow-up worth investigating later instead of derailing your current task. When you spot an interesting side-lead — a promising parameter, a partial auth bypass, a notably vulnerable service — queue a hypothesis for it. It is prioritized by the source finding's computed potential (novelty × impact × confidence), falling back to your stated priority when the finding has no score yet.`,
       parameters: Parameters,
       execute: ({ sourceFindingId, description, priority }, ctx) =>
         Effect.gen(function* () {
+          const sid = yield* engagementRoot(sessions, ctx.sessionID as string)
           const potential = yield* graph.getPotentialScore(sourceFindingId)
-          const id = yield* queue.push(ctx.sessionID as string, {
+          const id = yield* queue.push(sid, {
             sourceFindingId,
             description,
             priority: potential > 0 ? potential : clamp01(priority),

@@ -2,6 +2,8 @@ import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
 import { KnowledgeGraph } from "@impactr-ai/core/knowledge/graph"
 import { KnowledgeSaturation } from "@impactr-ai/core/session/saturation"
+import { Session } from "@/session/session"
+import { engagementRoot } from "./engagement-session"
 
 const clamp01 = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0)
 
@@ -18,12 +20,14 @@ export const RecordDiscoveryTool = Tool.define(
   Effect.gen(function* () {
     const graph = yield* KnowledgeGraph
     const saturation = yield* KnowledgeSaturation
+    const sessions = yield* Session.Service
     return {
       description: `Record a meaningful finding into the Knowledge Graph during your continuous discovery. A finding can be a subdomain, endpoint, vulnerability, technology fingerprint, credential, or any valuable intelligence. Score it (novelty × impact × confidence) to prioritize future exploration. Re-recording a finding with stronger evidence upgrades its scores; recording a pure duplicate is reported as such so you pursue a different lead.`,
       parameters: Parameters,
       execute: ({ type, data, noveltyScore, confidenceScore, impactScore }, ctx) =>
         Effect.gen(function* () {
-          const record = yield* graph.addFinding(ctx.sessionID as string, {
+          const sid = yield* engagementRoot(sessions, ctx.sessionID as string)
+          const record = yield* graph.addFinding(sid, {
             type,
             data,
             noveltyScore: clamp01(noveltyScore),
@@ -32,7 +36,7 @@ export const RecordDiscoveryTool = Tool.define(
           })
           // Only genuine progress feeds the saturation signal — re-recording a known finding with no
           // stronger evidence must not keep the engine running on stale ground.
-          if (record.status !== "duplicate") yield* saturation.recordFinding(ctx.sessionID as string)
+          if (record.status !== "duplicate") yield* saturation.recordFinding(sid)
           const potential = `potential ${record.potential.toFixed(2)} (novelty × impact × confidence)`
           if (record.status === "created") return `New discovery recorded with ID: ${record.id} — ${potential}.`
           if (record.status === "upgraded") return `Existing finding ${record.id} upgraded with stronger evidence — ${potential}.`

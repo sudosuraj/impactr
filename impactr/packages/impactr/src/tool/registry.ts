@@ -272,6 +272,7 @@ const layer = Layer.effect(
             tool.attack_plan,
             tool.record_discovery,
             tool.queue_hypothesis,
+            tool.browser,
             ...techniqueTools,
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
             ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),

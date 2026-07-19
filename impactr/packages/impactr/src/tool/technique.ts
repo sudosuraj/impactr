@@ -8,6 +8,8 @@ import { TechniqueParse } from "@impactr-ai/core/technique/parse"
 import { TechniqueIngest } from "@impactr-ai/core/technique/ingest"
 import type { Parsed } from "@impactr-ai/core/technique/asset"
 import { InstanceState } from "@/effect/instance-state"
+import { Session } from "@/session/session"
+import { engagementRoot } from "./engagement-session"
 
 /**
  * The technique tools — Impactr's "hands" in the CLI. Each wraps a proven engine, parses its output
@@ -51,12 +53,13 @@ export const makeTechnique = (spec: Spec) =>
       const graph = yield* AttackGraph
       const saturation = yield* KnowledgeSaturation
       const appProcess = yield* AppProcess.Service
+      const sessions = yield* Session.Service
       return {
         description: spec.description,
         parameters: Parameters,
         execute: ({ target }: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
           Effect.gen(function* () {
-            const sid = ctx.sessionID as string
+            const sid = yield* engagementRoot(sessions, ctx.sessionID as string)
             const instanceCtx = yield* InstanceState.context
             const command = ChildProcess.make(spec.engine, [...spec.buildArgs(target)], {
               cwd: instanceCtx.directory,

@@ -249,6 +249,8 @@ const layer = Layer.effect(
                 "*": "deny",
                 edit: "allow",
                 read: "allow",
+                // The report writer reads confirmed findings from the shared attack graph.
+                attack_graph: "allow",
                 external_directory: "allow"
               }),
               user,

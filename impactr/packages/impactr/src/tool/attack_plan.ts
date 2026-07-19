@@ -2,6 +2,8 @@ import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
 import { Plan, renderPlan } from "@impactr-ai/core/session/plan"
 import { playbooks } from "@impactr-ai/core/session/playbook"
+import { Session } from "@/session/session"
+import { engagementRoot } from "./engagement-session"
 
 const clamp01 = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0)
 
@@ -22,6 +24,7 @@ export const AttackPlanTool = Tool.define(
   "attack_plan",
   Effect.gen(function* () {
     const plan = yield* Plan
+    const sessions = yield* Session.Service
     return {
       description: `Maintain your plan of attack — the prioritized scan hierarchy you build for yourself and revise as you learn.
 Use "seed" with a playbook (web-app, api, external-network) to lay down a starting methodology for the target type, then adapt it.
@@ -31,7 +34,7 @@ Use "get" to review the current plan before deciding your next move.`,
       parameters: Parameters,
       execute: (args: Schema.Schema.Type<typeof Parameters>, ctx) =>
         Effect.gen(function* () {
-          const sid = ctx.sessionID as string
+          const sid = yield* engagementRoot(sessions, ctx.sessionID as string)
           if (args.action === "seed") {
             if (!args.playbook) return "Error: playbook is required to seed (web-app, api, or external-network)."
             const count = yield* plan.seed(sid, playbooks[args.playbook])
