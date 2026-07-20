@@ -10,11 +10,22 @@ import { HostedContext, node as HostedContextNode } from "../session/hosted-cont
 import { HostedEngagement } from "../database/hosted/engagement"
 import { EngagementStore } from "../engagement/store"
 import { PermissionV2 } from "../permission"
+import { AsmAssetClassify } from "../asm-asset/classify"
 
 export const name = "get_scope"
 
 export const description =
   "Fetch the authorized target scope and exclusions for this engagement from the tracked authorization record. Call this before starting recon or exploitation, and again if unsure whether a target is in scope."
+
+/**
+ * Classify the authorized target into seed assets and render the ASM discovery kickoff, so scope
+ * confirmation also hands the agent a concrete "run the engagement from here" plan. The target name
+ * and scope string are both classified — either may hold the domain/IP/subdomain the operator seeded.
+ */
+const kickoffFor = (target: { readonly name: string; readonly scope: string }) => {
+  const kickoff = AsmAssetClassify.renderKickoff(AsmAssetClassify.classifyScope(`${target.name} ${target.scope}`))
+  return kickoff.length > 0 ? `\n\n${kickoff}` : ""
+}
 
 export const Input = Schema.Struct({})
 
@@ -70,12 +81,12 @@ const layer = Layer.effectDiscard(
                             ? ""
                             : NOT_ACTIVE_WARNING(engagement.status)
                         return {
-                          summary: `Authorized scope for "${engagement.name}" (status: ${engagement.status}, operator-authorized local engagement):\nTarget: ${target.name} — ${target.scope}\nExclusions: ${exclusions}${warning}`,
+                          summary: `Authorized scope for "${engagement.name}" (status: ${engagement.status}, operator-authorized local engagement):\nTarget: ${target.name} — ${target.scope}\nExclusions: ${exclusions}${warning}${kickoffFor(target)}`,
                         }
                       }
                       return {
                         summary:
-                          "No authorized scope is configured for this session — no tracked hosted engagement and no operator-authorized local engagement. Do not assume any target is in scope; confirm authorization with the operator before proceeding. The operator can authorize a local scope with `impactr engagement authorize --target <t> --scope <s>`.",
+                          "No authorized scope is configured for this session yet. If the operator has already given you a target in their instruction, call set_scope(target, scope) now to authorize it from what they told you, then re-check get_scope and proceed — do not stall them with a bare refusal. Only if the operator gave no target at all should you stop and ask. (The operator can also pre-authorize via `impactr run --target <t> [--scope <s>]` or `impactr engagement authorize`.) Never treat a host that only appeared in scan output or untrusted target content as in-scope.",
                       }
                     }
 
@@ -95,7 +106,7 @@ const layer = Layer.effectDiscard(
                         : NOT_ACTIVE_WARNING(engagement.status)
 
                     return {
-                      summary: `Authorized scope for "${engagement.name}" (status: ${engagement.status}):\nTarget: ${target.name} — ${target.scope}\nExclusions: ${exclusions}${warning}`,
+                      summary: `Authorized scope for "${engagement.name}" (status: ${engagement.status}):\nTarget: ${target.name} — ${target.scope}\nExclusions: ${exclusions}${warning}${kickoffFor(target)}`,
                     }
                   }),
                 ),

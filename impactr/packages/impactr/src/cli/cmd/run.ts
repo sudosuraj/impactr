@@ -1,5 +1,6 @@
 import type { PermissionV1 } from "@impactr-ai/core/v1/permission"
 import { FSUtil } from "@impactr-ai/core/fs-util"
+import { EngagementStore } from "@impactr-ai/core/engagement/store"
 // CLI entry point for `impactr run` and `impactr --mini`.
 //
 // Handles three modes:
@@ -175,6 +176,19 @@ export const RunCommand = effectCmd({
         type: "string",
         describe: "engagement id to associate with this session (links pentest findings/attack-graph to the hosted dashboard)",
       })
+      .option("target", {
+        type: "string",
+        describe: "authorized pentest target (e.g. acme-corp.com). Launching with a target authorizes a local engagement scoped to this directory, so get_scope resolves without a separate `engagement authorize` step.",
+      })
+      .option("scope", {
+        type: "string",
+        describe: "authorized scope for --target (e.g. '*.acme-corp.com, 10.0.0.0/24'). Defaults to the target itself.",
+      })
+      .option("exclude", {
+        type: "string",
+        array: true,
+        describe: "out-of-scope target(s) to exclude (repeatable)",
+      })
       .option("format", {
         type: "string",
         choices: ["default", "json"],
@@ -272,6 +286,33 @@ export const RunCommand = effectCmd({
     const agentSvc = yield* Agent.Service
     const flags = yield* RuntimeFlags.Service
     const localInstance = yield* InstanceRef
+
+    // Scope from target: launching a local run with --target IS the operator's authorization act,
+    // so get_scope resolves instead of telling the agent "no scope is configured". Scoped to the
+    // run directory (the same key resolveForSession falls back on), and deduped so repeated runs of
+    // the same target reuse one engagement record. Remote (--attach) authorization stays server-side.
+    if (args.target && !args.attach) {
+      const store = yield* EngagementStore.Service
+      const directory = args.dir ? path.resolve(process.cwd(), args.dir) : process.cwd()
+      const scope = args.scope ?? args.target
+      const exclusions = (args.exclude ?? []).map((entry) => entry.trim()).filter((entry) => entry.length > 0)
+      const existing = EngagementStore.findReusable(yield* store.list(), { directory, target: args.target, scope })
+      const engagement =
+        existing ??
+        (yield* store.authorize({
+          name: `Pentest: ${args.target}`,
+          target: args.target,
+          scope,
+          exclusions,
+          directory,
+        }))
+      yield* Effect.sync(() =>
+        UI.println(
+          `${existing ? "Using authorized" : "Authorized"} scope for ${engagement.scope.target.name} — ${engagement.scope.target.scope}` +
+            (exclusions.length > 0 ? ` (excluding ${exclusions.join(", ")})` : ""),
+        ),
+      )
+    }
     yield* Effect.promise(async () => {
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const interactive = args.mini
@@ -995,6 +1036,9 @@ export async function runMini(input: MiniCommandInput) {
     model: input.model,
     agent: input.agent,
     engagement: input.engagement,
+    target: undefined,
+    scope: undefined,
+    exclude: undefined,
     format: "default",
     file: undefined,
     title: undefined,

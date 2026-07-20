@@ -2,6 +2,7 @@ import { effectCmd, fail } from "../effect-cmd"
 import { Effect } from "effect"
 import { UI } from "../ui"
 import { EngagementStore } from "@impactr-ai/core/engagement/store"
+import { AsmAssetClassify } from "@impactr-ai/core/asm-asset/classify"
 
 /**
  * Operator-only management of local (non-hosted) engagement authorization. Running
@@ -72,11 +73,15 @@ export const EngagementCommand = effectCmd({
         directory: process.cwd(),
         authorizedBy: args.attestation,
       })
+      const kickoff = AsmAssetClassify.renderKickoff(
+        AsmAssetClassify.classifyScope(`${engagement.scope.target.name} ${engagement.scope.target.scope}`),
+      )
       yield* Effect.sync(() =>
         UI.println(
           `Authorized local engagement "${engagement.name}" (${engagement.id})\n` +
             `  Target: ${engagement.scope.target.name} — ${engagement.scope.target.scope}\n` +
-            `  Exclusions: ${exclusions.length > 0 ? exclusions.join(", ") : "(none)"}`,
+            `  Exclusions: ${exclusions.length > 0 ? exclusions.join(", ") : "(none)"}` +
+            (kickoff.length > 0 ? `\n\n${kickoff}` : ""),
         ),
       )
     }),

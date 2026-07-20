@@ -27,6 +27,11 @@ import { SessionStore } from "../session/store"
 import { SessionRunnerModel } from "../session/runner/model"
 import { BackgroundJob } from "../background-job"
 import * as SessionBudget from "../session/budget"
+import { Database } from "../database/database"
+import { EventV2 } from "../event"
+import { SessionInput } from "../session/input"
+import { SessionMessage } from "../session/message"
+import { Prompt } from "../session/prompt"
 
 export const name = "run_agent"
 export const batchName = "run_agents"
@@ -164,6 +169,8 @@ const layer = Layer.effectDiscard(
     const toolRegistry = yield* ToolRegistry.Service
     const backgroundJobs = yield* BackgroundJob.Service
     const budget = yield* SessionBudget.SessionBudget
+    const db = (yield* Database.Service).db
+    const events = yield* EventV2.Service
 
     const loadSystemContext = (agent: AgentV2.Selection) =>
       Effect.all([systemContext.load(), skillGuidance.load(agent), referenceGuidance.load()], {
@@ -312,12 +319,30 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               if (input.background) {
+                const parentSessionID = context.sessionID
                 const job = yield* backgroundJobs.start({
                   type: "subagent",
                   title: `Subagent: ${input.agent}`,
-                  run: runSubagent({ agent: input.agent, prompt: input.prompt }, context),
+                  // Event-driven signal back to the delegator: when the background subagent settles,
+                  // admit its synthesis into the parent session as a queued input. The engine surfaces
+                  // it on the parent's next idle continuation — so the task-giver is notified of the
+                  // result instead of polling, while it kept working other leads in the meantime.
+                  run: runSubagent({ agent: input.agent, prompt: input.prompt }, context).pipe(
+                    Effect.tap((output) =>
+                      SessionInput.admit(db, events, {
+                        id: SessionMessage.ID.create(),
+                        sessionID: parentSessionID,
+                        prompt: Prompt.make({
+                          text: `Background subagent '${input.agent}' finished. Its report:\n\n${output}`,
+                        }),
+                        delivery: "queue",
+                      }),
+                    ),
+                  ),
                 })
-                return { output: `Subagent started asynchronously with background job ID: ${job.id}` }
+                return {
+                  output: `Subagent '${input.agent}' started asynchronously (background job ${job.id}). Keep working other leads; its report will be delivered back to you as a queued follow-up when it finishes.`,
+                }
               }
               const finalOutput = yield* runSubagent({ agent: input.agent, prompt: input.prompt }, context)
               return { output: finalOutput }
@@ -393,5 +418,7 @@ export const node = makeLocationNode({
     SessionRunnerModel.node,
     BackgroundJob.node,
     SessionBudget.node,
+    Database.node,
+    EventV2.node,
   ],
 })
