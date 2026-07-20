@@ -136,6 +136,11 @@ const runViewer = (
       }
     }
 
+    // Declared before use so a throw in the try block below can still clean up: cleanup()
+    // clears this via clearInterval, which would hit the temporal dead zone if `timer` were
+    // declared after the try block (its setInterval call only succeeds once setup completes).
+    let timer: ReturnType<typeof setInterval> | undefined
+
     const cleanup = () => {
       if (stopped) return
       stopped = true
@@ -168,13 +173,12 @@ const runViewer = (
       stdin.on("data", onKey)
       draw()
       void refresh()
+      timer = setInterval(() => void refresh(), opts.intervalMs)
     } catch (error) {
       cleanup()
       reject(error instanceof Error ? error : new Error(String(error)))
       return
     }
-
-    const timer = setInterval(() => void refresh(), opts.intervalMs)
   })
 
 export const GraphCommand = effectCmd({

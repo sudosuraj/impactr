@@ -8,12 +8,13 @@ const eng = (over: {
   directory: string | null
   target: string
   scope: string
+  exclusions?: string[]
 }): EngagementStore.LocalEngagement => ({
   id: over.id as EngagementSchema.ID,
   name: over.target,
   status: over.status,
   directory: over.directory,
-  scope: { target: { name: over.target, scope: over.scope, exclusions: [] } },
+  scope: { target: { name: over.target, scope: over.scope, exclusions: over.exclusions ?? [] } },
 })
 
 describe("EngagementStore.findReusable", () => {
@@ -44,5 +45,35 @@ describe("EngagementStore.findReusable", () => {
     const list = [eng({ id: "eng_1", status: "authorized", directory: dir, target: "acme.com", scope: "*.acme.com" })]
     expect(EngagementStore.findReusable(list, { directory: "/other", target: "acme.com", scope: "*.acme.com" })).toBeUndefined()
     expect(EngagementStore.findReusable(list, { directory: dir, target: "acme.com", scope: "acme.com" })).toBeUndefined()
+  })
+
+  test("does not reuse when the requested exclusions differ from the stored ones", () => {
+    const list = [
+      eng({ id: "eng_1", status: "authorized", directory: dir, target: "acme.com", scope: "*.acme.com", exclusions: [] }),
+    ]
+    expect(
+      EngagementStore.findReusable(list, { directory: dir, target: "acme.com", scope: "*.acme.com", exclusions: ["dev.acme.com"] }),
+    ).toBeUndefined()
+  })
+
+  test("reuses when the requested exclusions match the stored ones regardless of order", () => {
+    const list = [
+      eng({
+        id: "eng_1",
+        status: "authorized",
+        directory: dir,
+        target: "acme.com",
+        scope: "*.acme.com",
+        exclusions: ["b.acme.com", "a.acme.com"],
+      }),
+    ]
+    expect(
+      EngagementStore.findReusable(list, {
+        directory: dir,
+        target: "acme.com",
+        scope: "*.acme.com",
+        exclusions: ["a.acme.com", "b.acme.com"],
+      })?.id,
+    ).toBe("eng_1" as EngagementSchema.ID)
   })
 })

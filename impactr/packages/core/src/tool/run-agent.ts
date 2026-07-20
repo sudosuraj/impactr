@@ -32,6 +32,7 @@ import { EventV2 } from "../event"
 import { SessionInput } from "../session/input"
 import { SessionMessage } from "../session/message"
 import { Prompt } from "../session/prompt"
+import { SessionExecution } from "../session/execution"
 
 export const name = "run_agent"
 export const batchName = "run_agents"
@@ -171,6 +172,7 @@ const layer = Layer.effectDiscard(
     const budget = yield* SessionBudget.SessionBudget
     const db = (yield* Database.Service).db
     const events = yield* EventV2.Service
+    const execution = yield* SessionExecution.Service
 
     const loadSystemContext = (agent: AgentV2.Selection) =>
       Effect.all([systemContext.load(), skillGuidance.load(agent), referenceGuidance.load()], {
@@ -324,9 +326,10 @@ const layer = Layer.effectDiscard(
                   type: "subagent",
                   title: `Subagent: ${input.agent}`,
                   // Event-driven signal back to the delegator: when the background subagent settles,
-                  // admit its synthesis into the parent session as a queued input. The engine surfaces
-                  // it on the parent's next idle continuation — so the task-giver is notified of the
-                  // result instead of polling, while it kept working other leads in the meantime.
+                  // admit its synthesis into the parent session as a queued input, then wake the
+                  // parent so it's delivered immediately rather than sitting until some unrelated
+                  // prompt happens to promote it — the parent may well have already gone idle by
+                  // the time this background job finishes.
                   run: runSubagent({ agent: input.agent, prompt: input.prompt }, context).pipe(
                     Effect.tap((output) =>
                       SessionInput.admit(db, events, {
@@ -338,6 +341,7 @@ const layer = Layer.effectDiscard(
                         delivery: "queue",
                       }),
                     ),
+                    Effect.tap(() => execution.wake(parentSessionID)),
                   ),
                 })
                 return {
@@ -420,5 +424,6 @@ export const node = makeLocationNode({
     SessionBudget.node,
     Database.node,
     EventV2.node,
+    SessionExecution.node,
   ],
 })

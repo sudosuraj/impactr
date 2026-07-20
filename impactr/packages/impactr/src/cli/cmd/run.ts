@@ -290,13 +290,15 @@ export const RunCommand = effectCmd({
     // Scope from target: launching a local run with --target IS the operator's authorization act,
     // so get_scope resolves instead of telling the agent "no scope is configured". Scoped to the
     // run directory (the same key resolveForSession falls back on), and deduped so repeated runs of
-    // the same target reuse one engagement record. Remote (--attach) authorization stays server-side.
+    // the same target (including the same --exclude set) reuse one engagement record. Remote
+    // (--attach) authorization stays server-side.
+    let bindEngagement: ((sessionID: string) => Effect.Effect<void>) | undefined
     if (args.target && !args.attach) {
       const store = yield* EngagementStore.Service
       const directory = args.dir ? path.resolve(process.cwd(), args.dir) : process.cwd()
       const scope = args.scope ?? args.target
       const exclusions = (args.exclude ?? []).map((entry) => entry.trim()).filter((entry) => entry.length > 0)
-      const existing = EngagementStore.findReusable(yield* store.list(), { directory, target: args.target, scope })
+      const existing = EngagementStore.findReusable(yield* store.list(), { directory, target: args.target, scope, exclusions })
       const engagement =
         existing ??
         (yield* store.authorize({
@@ -312,6 +314,10 @@ export const RunCommand = effectCmd({
             (exclusions.length > 0 ? ` (excluding ${exclusions.join(", ")})` : ""),
         ),
       )
+      // Bind explicitly rather than relying on resolveForSession's directory fallback: an already-
+      // bound (--continue/--session) session would otherwise keep its old engagement's scope even
+      // though the operator just passed a different --target on this invocation.
+      bindEngagement = (sessionID) => store.bindSession(sessionID as any, engagement.id)
     }
     yield* Effect.promise(async () => {
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
@@ -721,6 +727,10 @@ export const RunCommand = effectCmd({
           process.exit(1)
         }
         const sessionID = sess.id
+
+        if (bindEngagement) {
+          await Effect.runPromise(bindEngagement(sessionID))
+        }
 
         function emit(type: string, data: Record<string, unknown>) {
           if (args.format === "json") {

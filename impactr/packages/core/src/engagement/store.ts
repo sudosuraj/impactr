@@ -55,15 +55,21 @@ export class Service extends Context.Service<Service, Interface>()("@impactr-ai/
  */
 export const findReusable = (
   engagements: readonly LocalEngagement[],
-  match: { readonly directory: string; readonly target: string; readonly scope: string },
-): LocalEngagement | undefined =>
-  engagements.find(
-    (engagement) =>
+  match: { readonly directory: string; readonly target: string; readonly scope: string; readonly exclusions?: readonly string[] },
+): LocalEngagement | undefined => {
+  const exclusions = [...(match.exclusions ?? [])].sort()
+  return engagements.find((engagement) => {
+    const engagementExclusions = [...engagement.scope.target.exclusions].sort()
+    return (
       (engagement.status === "authorized" || engagement.status === "active") &&
       engagement.directory === match.directory &&
       engagement.scope.target.name === match.target &&
-      engagement.scope.target.scope === match.scope,
-  )
+      engagement.scope.target.scope === match.scope &&
+      engagementExclusions.length === exclusions.length &&
+      engagementExclusions.every((value, i) => value === exclusions[i])
+    )
+  })
+}
 
 const toLocal = (row: typeof EngagementLocalTable.$inferSelect): LocalEngagement => ({
   id: row.id,
