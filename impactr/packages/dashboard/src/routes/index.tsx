@@ -1,5 +1,5 @@
-import { createAsync } from "@solidjs/router"
-import { Show } from "solid-js"
+import { createAsync, revalidate } from "@solidjs/router"
+import { Show, createSignal, onCleanup } from "solid-js"
 import { AppShell } from "~/components/layout/app-shell"
 import { Card, CardHeader } from "~/components/ui/card"
 import { SkeletonCard } from "~/components/ui/skeleton"
@@ -12,8 +12,21 @@ import { SurfaceTerrain } from "~/components/dashboard/surface-terrain"
 import { AttackGraphMap } from "~/components/dashboard/attack-graph-map"
 import { getCommandCenter } from "~/lib/command-center"
 
+const LIVE_INTERVAL_MS = 5000
+
 export default function Dashboard() {
   const data = createAsync(() => getCommandCenter())
+  const [live, setLive] = createSignal(true)
+
+  // Live view: re-run the command-center query on an interval so the graph, KPIs, and leads
+  // track the engine as it maps the surface. Client-only (no server timers), paused on demand,
+  // and cleaned up on unmount. `createAsync` re-resolves whenever the query is revalidated.
+  if (typeof window !== "undefined") {
+    const timer = setInterval(() => {
+      if (live()) void revalidate(getCommandCenter.key)
+    }, LIVE_INTERVAL_MS)
+    onCleanup(() => clearInterval(timer))
+  }
 
   return (
     <AppShell>
@@ -25,19 +38,30 @@ export default function Dashboard() {
           </div>
           <Show when={data()}>
             {(d) => (
-              <span class="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-[12.5px] text-muted">
-                <span class="relative flex h-[7px] w-[7px]">
-                  <span
-                    class={`h-[7px] w-[7px] rounded-full ${d().discovery.current > 0 ? "bg-brand agent-pulse" : "bg-muted-foreground"}`}
-                  />
-                </span>
-                <Show when={d().discovery.current > 0} fallback={<span>Agent idle</span>}>
-                  <span>
-                    Agent <span class="font-semibold text-foreground">active</span>
+              <div class="inline-flex items-center gap-2">
+                <span class="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-[12.5px] text-muted">
+                  <span class="relative flex h-[7px] w-[7px]">
+                    <span
+                      class={`h-[7px] w-[7px] rounded-full ${d().discovery.current > 0 ? "bg-brand agent-pulse" : "bg-muted-foreground"}`}
+                    />
                   </span>
-                </Show>
-                · tracking <span class="font-semibold text-foreground tnum">{d().kpis.surface}</span> assets
-              </span>
+                  <Show when={d().discovery.current > 0} fallback={<span>Agent idle</span>}>
+                    <span>
+                      Agent <span class="font-semibold text-foreground">active</span>
+                    </span>
+                  </Show>
+                  · tracking <span class="font-semibold text-foreground tnum">{d().kpis.surface}</span> assets
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setLive((v) => !v)}
+                  class="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[12.5px] text-muted hover:text-foreground"
+                  title={live() ? "Pause live updates" : "Resume live updates"}
+                >
+                  <span class={`h-[7px] w-[7px] rounded-full ${live() ? "bg-brand agent-pulse" : "bg-muted-foreground"}`} />
+                  {live() ? "Live" : "Paused"}
+                </button>
+              </div>
             )}
           </Show>
         </div>

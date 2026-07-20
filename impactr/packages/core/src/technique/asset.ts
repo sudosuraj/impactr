@@ -46,3 +46,5 @@ export const ipId = (ip: string) => `ip:${ip}`
 export const portId = (host: string, port: number | string) => `port:${host}:${port}`
 export const endpointId = (url: string) => `endpoint:${url}`
 export const credentialId = (value: string) => `credential:${value}`
+/** A vulnerability keyed by its template/type and where it was matched, so the same finding dedupes. */
+export const vulnerabilityId = (kind: string, matchedAt: string) => `vulnerability:${kind}@${matchedAt}`

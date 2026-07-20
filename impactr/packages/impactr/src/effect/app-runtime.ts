@@ -4,6 +4,7 @@ import * as Observability from "@impactr-ai/core/observability"
 
 import { FSUtil } from "@impactr-ai/core/fs-util"
 import { Database } from "@impactr-ai/core/database/database"
+import * as AttackGraph from "@impactr-ai/core/attack-graph/graph"
 import { EngagementStore } from "@impactr-ai/core/engagement/store"
 import { Auth } from "@/auth"
 import { Account } from "@/account/account"
@@ -61,6 +62,7 @@ export const AppLayer = AppNodeBuilderV1.build(
     Npm.node,
     FSUtil.node,
     Database.node,
+    AttackGraph.node,
     EngagementStore.node,
     Auth.node,
     Account.node,

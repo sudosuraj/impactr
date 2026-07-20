@@ -20,10 +20,13 @@ import { AskPermissionTool } from "./ask_permission"
 import { ManageTaskTool } from "./manage_task"
 import { AttackGraphTool } from "./attack_graph"
 import { AttackPlanTool } from "./attack_plan"
+import { SetScopeTool } from "./set_scope"
+import { GetScopeTool } from "./get_scope"
 import { RecordDiscoveryTool } from "./record_discovery"
 import { QueueHypothesisTool } from "./queue_hypothesis"
 import { BrowserTool } from "./browser"
 import { node as PlanNode } from "@impactr-ai/core/session/plan"
+import { node as EngagementStoreNode } from "@impactr-ai/core/engagement/store"
 import { node as KnowledgeGraphNode } from "@impactr-ai/core/knowledge/graph"
 import { node as KnowledgeSaturationNode } from "@impactr-ai/core/session/saturation"
 import { node as HypothesisQueueNode } from "@impactr-ai/core/session/hypothesis-queue"
@@ -123,6 +126,8 @@ const layer = Layer.effect(
     const manageTask = yield* ManageTaskTool
     const attackGraph = yield* AttackGraphTool
     const attackPlan = yield* AttackPlanTool
+    const setScope = yield* SetScopeTool
+    const getScope = yield* GetScopeTool
     const recordDiscovery = yield* RecordDiscoveryTool
     const queueHypothesis = yield* QueueHypothesisTool
     const browserTool = yield* BrowserTool
@@ -242,6 +247,8 @@ const layer = Layer.effect(
           manage_task: Tool.init(manageTask),
           attack_graph: Tool.init(attackGraph),
           attack_plan: Tool.init(attackPlan),
+          set_scope: Tool.init(setScope),
+          get_scope: Tool.init(getScope),
           record_discovery: Tool.init(recordDiscovery),
           queue_hypothesis: Tool.init(queueHypothesis),
           browser: Tool.init(browserTool),
@@ -270,6 +277,8 @@ const layer = Layer.effect(
             // methodology actually executable rather than advisory.
             tool.attack_graph,
             tool.attack_plan,
+            tool.set_scope,
+            tool.get_scope,
             tool.record_discovery,
             tool.queue_hypothesis,
             tool.browser,
@@ -464,6 +473,7 @@ export const node = LayerNode.make({
     KnowledgeGraphNode,
     KnowledgeSaturationNode,
     HypothesisQueueNode,
+    EngagementStoreNode,
     BrowserManager.node,
   ],
 })

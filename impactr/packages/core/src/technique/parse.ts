@@ -9,6 +9,7 @@ import {
   merge,
   portId,
   subdomainId,
+  vulnerabilityId,
 } from "./asset"
 
 /**
@@ -122,6 +123,50 @@ export const httpx = (stdout: string): Parsed => {
     if (host) {
       assets.set(subdomainId(host), { id: subdomainId(host), type: "subdomain", label: host })
       relations.push({ source: subdomainId(host), target: endpointId(url), relation: "exposes" })
+    }
+  }
+  return { assets: [...assets.values()], relations }
+}
+
+/**
+ * nuclei `-jsonl` → vulnerability assets, each linked to the endpoint/host it was matched at via a
+ * `vulnerable_to` edge so exploit chains form in the graph. This is the one technique that finds the
+ * bugs (CVEs, misconfigs, exposures) rather than just mapping surface. Severity is carried on both
+ * the node and the edge so chain-hunting can weight by impact.
+ */
+export const nuclei = (stdout: string): Parsed => {
+  const assets = new Map<string, Asset>()
+  const relations: Relation[] = []
+  for (const row of jsonl(stdout)) {
+    const templateId = asString(row["template-id"]) ?? asString(row.templateID) ?? asString(row.template_id)
+    const info = (row.info && typeof row.info === "object" ? row.info : {}) as Record<string, unknown>
+    const severity = (asString(info.severity) ?? "unknown").toLowerCase()
+    const name = asString(info.name) ?? templateId ?? "finding"
+    const matchedAt = asString(row["matched-at"]) ?? asString(row.matched_at) ?? asString(row.url)
+    const host = asString(row.host)
+    const location = matchedAt ?? host
+    if (!templateId && !location) continue
+    const kind = templateId ?? "finding"
+    const vid = vulnerabilityId(kind, location ?? "unknown")
+    const attributes: Record<string, unknown> = { severity, templateId: kind }
+    if (location) attributes.matchedAt = location
+    const tags = asStringArray(info.tags)
+    if (tags.length) attributes.tags = tags
+    const description = asString(info.description)
+    if (description) attributes.description = description
+    const protocol = asString(row.type)
+    if (protocol) attributes.protocol = protocol
+    assets.set(vid, { id: vid, type: "vulnerability", label: `${name} [${severity}]`, attributes, status: "pending" })
+    // Link the affected asset to the vulnerability so a chain (endpoint --vulnerable_to--> vuln) forms.
+    if (matchedAt && /^https?:\/\//.test(matchedAt)) {
+      assets.set(endpointId(matchedAt), { id: endpointId(matchedAt), type: "endpoint", label: matchedAt })
+      relations.push({ source: endpointId(matchedAt), target: vid, relation: "vulnerable_to", attributes: { severity } })
+    } else if (host) {
+      // Mirror naabu's handling: a bare IP host is an `ip` node, not a `subdomain` — mislabeling it
+      // would misrepresent network assets in the attack graph.
+      const hostAsset: Asset = isIpv4(host) ? { id: ipId(host), type: "ip", label: host } : { id: subdomainId(host), type: "subdomain", label: host }
+      assets.set(hostAsset.id, hostAsset)
+      relations.push({ source: hostAsset.id, target: vid, relation: "vulnerable_to", attributes: { severity } })
     }
   }
   return { assets: [...assets.values()], relations }

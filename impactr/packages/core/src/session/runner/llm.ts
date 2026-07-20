@@ -50,6 +50,7 @@ import * as KnowledgeSaturation from "../saturation"
 import * as HypothesisQueue from "../hypothesis-queue"
 import * as KnowledgeGraph from "../../knowledge/graph"
 import * as Plan from "../plan"
+import { EngagementReport } from "../engagement-report"
 
 /**
  * Runs one durable coding-agent Session until it settles.
@@ -124,6 +125,7 @@ const layer = Layer.effect(
     const hypothesisQueue = yield* HypothesisQueue.HypothesisQueue
     const knowledgeGraph = yield* KnowledgeGraph.KnowledgeGraph
     const plan = yield* Plan.Plan
+    const engagementReport = yield* EngagementReport.Service
     const projectId = location.project.id
     const compaction = SessionCompaction.make({
       events,
@@ -565,6 +567,18 @@ const layer = Layer.effect(
         shouldRun = yield* SessionInput.hasPending(db, input.sessionID, "queue")
         promotion = shouldRun ? "queue" : undefined
       }
+
+      // The autonomous engine has wound down. When it stopped because the engagement
+      // genuinely concluded — knowledge saturated or budget exhausted — synthesize the
+      // consolidated report from the graph state so the run ends with a human-readable
+      // artifact instead of a silent SQLite graph. A report failure must never fail the
+      // run, and generate() no-ops when there is nothing worth reporting.
+      const saturated = yield* saturation.isSaturated(input.sessionID)
+      const concluded = saturated ? "saturated" : (yield* budget.isExhausted()) ? "budget-exhausted" : undefined
+      if (concluded)
+        yield* engagementReport
+          .generate(input.sessionID, concluded)
+          .pipe(Effect.catch(() => Effect.void), Effect.catchDefect(() => Effect.void))
     })
 
     return Service.of({
@@ -597,5 +611,6 @@ export const node = makeLocationNode({
     HypothesisQueue.node,
     KnowledgeGraph.node,
     Plan.node,
+    EngagementReport.node,
   ],
 })

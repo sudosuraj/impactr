@@ -144,19 +144,31 @@ const layer = Layer.effect(
         const agents: Record<string, Info> = {
           attack: {
             name: "attack",
-            description: "Full engagement agent. Runs the complete pentest lifecycle.",
+            description: "Full engagement orchestrator. Plans strategy, owns the attack graph and scope, and delegates ALL execution to subagents. Runs no scanning or exploitation tools itself.",
             prompt: PROMPT_ORCHESTRATOR,
             options: {},
+            // The orchestrator MANAGES and DELEGATES — deny-by-default, then allow only the
+            // strategy/scope/graph/delegation tools. No shell, no technique scanners, no webfetch,
+            // no edit: every concrete action against the target is delegated to a subagent. This is
+            // a hard capability boundary, not just a prompt instruction.
             permission: Permission.merge(
               defaults,
               Permission.fromConfig({
+                "*": "deny",
                 question: "deny",
-                plan_enter: "allow",
-                shell: "allow",
-                webfetch: "allow",
-                edit: "allow",
+                task: "allow",
+                set_scope: "allow",
+                get_scope: "allow",
+                attack_graph: "allow",
+                attack_plan: "allow",
+                record_discovery: "allow",
+                queue_hypothesis: "allow",
+                manage_task: "allow",
+                todowrite: "allow",
                 read: "allow",
-                external_directory: "allow"
+                websearch: "allow",
+                ask_permission: "allow",
+                external_directory: "allow",
               }),
               user,
             ),
@@ -196,6 +208,11 @@ const layer = Layer.effect(
                 shell: "allow",
                 webfetch: "allow",
                 read: "allow",
+                // Recursive delegation: enumerate can fan out its own child subagents (e.g. one per
+                // host/wordlist) and hand a proven lead to `exploit` — parallelism, not serial grind.
+                task: "allow",
+                manage_task: "allow",
+                get_scope: "allow",
                 // Structured enumeration: the technique tools and the shared graph/knowledge stores.
                 attack_graph: "allow",
                 record_discovery: "allow",
@@ -207,6 +224,7 @@ const layer = Layer.effect(
                 crawl_site: "allow",
                 harvest_urls: "allow",
                 discover_content: "allow",
+                scan_vulnerabilities: "allow",
                 discover_api_spec: "allow",
                 analyze_javascript: "allow",
                 mine_parameters: "allow",

@@ -13,10 +13,21 @@ Repository layout (this git root):
 | Path | Purpose |
 |---|---|
 | `impactr/` | The Impactr application. All builds, tests, and typechecking happen inside this directory. |
-| `.agents/` | Human-readable reference copies of the pentesting agent definitions and the recon playbook skill (`.agents/skills/recon-playbook/SKILL.md`). Not what the runtime actually loads. |
-| `impactr/.impactr/agent/*.md` | The agent definitions the runtime actually loads (frontmatter + prompt), including `orchestrator`, `recon`, `attack`. |
+| `.agents/` | Old human-readable reference copies (recon playbook skill under `.agents/skills/`). NOT loaded by anything — do not treat as authoritative. |
 
-Scope note: Impactr must only be pointed at systems with explicit written authorization; the recon agent/playbook forbid exploiting anything during reconnaissance.
+### Source of truth for the running CLI (read this before editing agents or tools)
+
+The local CLI (`bun run dev`, `packages/impactr/src/index.ts`) is what actually runs. Its agents and tools are **defined in code**, not in any `.md`/`.json` config file:
+
+| What | Where (the ONLY place to edit) |
+|---|---|
+| **Agents** (prompt + permissions) | `impactr/packages/impactr/src/agent/agent.ts` (definitions) + `impactr/packages/impactr/src/agent/prompt/*.txt` (prompts). The primary agent is `attack` ("full engagement", prompt `orchestrator.txt`); subagents are `enumerate`, `exploit`, `report`; plus `recon`. |
+| **Tools** the agents can call | `impactr/packages/impactr/src/tool/registry.ts` + `impactr/packages/impactr/src/tool/*` (e.g. `task` = delegation, `attack_graph`, `attack_plan`, `record_discovery`, `queue_hypothesis`, `technique`, `shell`, `read`, …). A tool that isn't registered here is NOT available to the running agents, no matter what a prompt says. |
+| **Shared data stores** (used by both CLI and hosted) | `impactr/packages/core/src/{attack-graph,knowledge,session/plan,session/saturation,session/hypothesis-queue}` — the SQLite-backed graph/knowledge/plan state. Safe to build on; the runtime tools read/write these. |
+
+**Trap (this has burned us):** `impactr/packages/core/src/tool/*`, `impactr/packages/core/src/session/runner/*`, and any `.impactr/agent/*.md` override files are a **separate V2 / hosted-server lineage that the local CLI does NOT load.** Editing a tool or agent there changes nothing about what the CLI agent can do. When adding a capability to the running agent, add it under `packages/impactr/src/tool` + `registry.ts` and reference it from `packages/impactr/src/agent/prompt/*.txt` — then rebuild. Verify by checking the tool appears in the agent's materialized tool list, not by reading the prompt.
+
+Scope note: Impactr must only be pointed at systems with explicit written authorization; the agents forbid exploiting anything outside the operator-authorized scope.
 
 ## Commands
 
@@ -65,11 +76,15 @@ This is the **Continuous Discovery Engine**: it keeps a session running autonomo
 
 ### Agent roles
 
-Three agents, defined twice — once as a human-readable reference (`.agents/*/agent.json`, outer repo) and once as the runtime-loaded definition (`impactr/.impactr/agent/*.md`, frontmatter + prompt + permissions):
+All agents are defined **once**, in code, at `packages/impactr/src/agent/agent.ts` (permissions) with prompts in `packages/impactr/src/agent/prompt/*.txt`. There is no separate `.md`/`.json` agent-definition system anymore — the old parallel one was deleted, since it never loaded and only caused drift.
 
-- **`orchestrator`** (primary) — owns the Attack Graph, plans strategy, delegates rather than scanning directly. Has `attack_graph`/`record_discovery`/`queue_hypothesis` permission `allow`; `bash` is `ask`.
-- **`recon`** (subagent) — enumeration only (nmap/ffuf/gobuster-style tools), never exploits; returns a concise JSON array of discovered targets.
-- **`attack`** (subagent) — exploits one orchestrator-assigned vulnerability and proves impact; does not wander to other endpoints.
+- **`attack`** (primary, prompt `orchestrator.txt`) — the full-engagement orchestrator: plans strategy, owns the Attack Graph, delegates heavy work to subagents via the `task` tool. Deny-by-default permission (`*: deny`) with an explicit allow-list for strategy/scope/graph/delegation tools only — it runs no shell, edit, webfetch, or technique tools itself; every concrete action against the target is delegated to a subagent.
+- **`recon`** (primary, prompt `recon.txt`) — reconnaissance-only entry agent; maps surface, never exploits.
+- **`enumerate`** (subagent, prompt `enumerate.txt`) — deep active enumeration/fuzzing via the technique tools; spawned by `attack`.
+- **`exploit`** (subagent, prompt `exploit.txt`) — proves out one specific discovered vulnerability; spawned by `attack`.
+- **`report`** (subagent, prompt `report.txt`) — writes the final structured report from the shared attack graph.
+
+Delegation is the `task` tool (`packages/impactr/src/tool/task.ts`), not `run_agent`. To change an agent's behavior, edit its `.txt` prompt; to change what it can call, edit its permission block in `agent.ts` and register the tool in `packages/impactr/src/tool/registry.ts`.
 
 ### Session runtime
 

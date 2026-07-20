@@ -1,5 +1,6 @@
 import type { PermissionV1 } from "@impactr-ai/core/v1/permission"
 import { FSUtil } from "@impactr-ai/core/fs-util"
+import { EngagementStore } from "@impactr-ai/core/engagement/store"
 // CLI entry point for `impactr run` and `impactr --mini`.
 //
 // Handles three modes:
@@ -175,6 +176,19 @@ export const RunCommand = effectCmd({
         type: "string",
         describe: "engagement id to associate with this session (links pentest findings/attack-graph to the hosted dashboard)",
       })
+      .option("target", {
+        type: "string",
+        describe: "authorized pentest target (e.g. acme-corp.com). Launching with a target authorizes a local engagement scoped to this directory, so get_scope resolves without a separate `engagement authorize` step.",
+      })
+      .option("scope", {
+        type: "string",
+        describe: "authorized scope for --target (e.g. '*.acme-corp.com, 10.0.0.0/24'). Defaults to the target itself.",
+      })
+      .option("exclude", {
+        type: "string",
+        array: true,
+        describe: "out-of-scope target(s) to exclude (repeatable)",
+      })
       .option("format", {
         type: "string",
         choices: ["default", "json"],
@@ -272,6 +286,26 @@ export const RunCommand = effectCmd({
     const agentSvc = yield* Agent.Service
     const flags = yield* RuntimeFlags.Service
     const localInstance = yield* InstanceRef
+
+    // Scope from target: launching a local run with --target IS the operator's authorization act,
+    // so get_scope resolves instead of telling the agent "no scope is configured". Deduped so
+    // repeated runs of the same target (including the same --exclude set) reuse one engagement
+    // record. Remote (--attach) authorization stays server-side. Only the mutual-exclusion check
+    // and service resolution happen here — the actual authorize/bind (a DB write, plus a console
+    // confirmation) is deferred into the async block below, *after* input validation, so a launch
+    // that's going to abort anyway (empty message, --fork without --continue/--session, a bad
+    // --dir) never creates a stray authorization record or prints a misleading "Authorized scope"
+    // line for a run that didn't happen.
+    let bindEngagement: ((sessionID: string) => Effect.Effect<void>) | undefined
+    if (args.target && args.engagement) {
+      // --target binds the session to a freshly-authorized LOCAL engagement; --engagement links it
+      // to an existing HOSTED one. Letting both through would have the local bind silently
+      // overwrite the hosted linkage the operator explicitly asked for — fail fast instead of
+      // guessing which authorization record should win.
+      UI.error("--target and --engagement are mutually exclusive: --target authorizes a new local engagement, --engagement links to an existing hosted one.")
+      process.exit(1)
+    }
+    const engagementStore = args.target && !args.attach ? yield* EngagementStore.Service : undefined
     yield* Effect.promise(async () => {
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const interactive = args.mini
@@ -431,6 +465,42 @@ export const RunCommand = effectCmd({
         process.exit(1)
       }
 
+      // Deferred from the top of the handler (see comment there): validation above has now passed,
+      // so this launch is actually going to run — safe to authorize (a DB write) and confirm.
+      if (engagementStore && args.target) {
+        const target = args.target
+        const scope = args.scope ?? target
+        const exclusions = (args.exclude ?? []).map((entry) => entry.trim()).filter((entry) => entry.length > 0)
+        const targetDirectory = directory ?? root
+        const { engagement, reused } = await Effect.runPromise(
+          Effect.gen(function* () {
+            const existing = EngagementStore.findReusable(yield* engagementStore.list(), {
+              directory: targetDirectory,
+              target,
+              scope,
+              exclusions,
+            })
+            if (existing) return { engagement: existing, reused: true }
+            const created = yield* engagementStore.authorize({
+              name: `Pentest: ${target}`,
+              target,
+              scope,
+              exclusions,
+              directory: targetDirectory,
+            })
+            return { engagement: created, reused: false }
+          }),
+        )
+        UI.println(
+          `${reused ? "Using authorized" : "Authorized"} scope for ${engagement.scope.target.name} — ${engagement.scope.target.scope}` +
+            (exclusions.length > 0 ? ` (excluding ${exclusions.join(", ")})` : ""),
+        )
+        // Bind explicitly rather than relying on resolveForSession's directory fallback: an already-
+        // bound (--continue/--session) session would otherwise keep its old engagement's scope even
+        // though the operator just passed a different --target on this invocation.
+        bindEngagement = (sessionID) => engagementStore.bindSession(sessionID as any, engagement.id)
+      }
+
       const rules: PermissionV1.Ruleset = interactive
         ? []
         : [
@@ -457,7 +527,23 @@ export const RunCommand = effectCmd({
         return message.slice(0, 50) + (message.length > 50 ? "..." : "")
       }
 
+      // Every code path that resolves or mints a session ID for this invocation funnels through
+      // `session()` (resolve/fork/continue/default-create) or `createFreshSession()` (interactive
+      // /new) — binding once here, rather than at each call site, is what makes it apply uniformly,
+      // including the interactive-local-mode path that never calls `execute()` (and so would
+      // otherwise miss the explicit bind entirely, silently falling back to resolveForSession's
+      // directory-latest guess instead of the target the operator just passed).
+      const bindIfTargeted = async (sessionID: string | undefined) => {
+        if (sessionID && bindEngagement) await Effect.runPromise(bindEngagement(sessionID))
+      }
+
       async function session(sdk: ImpactrClient): Promise<SessionInfo | undefined> {
+        const resolved = await sessionImpl(sdk)
+        await bindIfTargeted(resolved?.id)
+        return resolved
+      }
+
+      async function sessionImpl(sdk: ImpactrClient): Promise<SessionInfo | undefined> {
         if (args.session) {
           const current = await sdk.session
             .get({
@@ -575,6 +661,7 @@ export const RunCommand = effectCmd({
         }
 
         void share(sdk, id).catch(() => {})
+        await bindIfTargeted(id)
         return {
           id,
           title: result.data?.title,
@@ -995,6 +1082,9 @@ export async function runMini(input: MiniCommandInput) {
     model: input.model,
     agent: input.agent,
     engagement: input.engagement,
+    target: undefined,
+    scope: undefined,
+    exclude: undefined,
     format: "default",
     file: undefined,
     title: undefined,

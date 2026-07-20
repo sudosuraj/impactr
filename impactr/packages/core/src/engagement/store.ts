@@ -48,6 +48,29 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@impactr-ai/core/engagement/Store") {}
 
+/**
+ * Find an existing still-valid local engagement that already authorizes the same directory + scope,
+ * so launching a run with a target that was already authorized reuses that record instead of piling
+ * up a new engagement every time. Pure and testable; the CLI calls it before `authorize`.
+ */
+export const findReusable = (
+  engagements: readonly LocalEngagement[],
+  match: { readonly directory: string; readonly target: string; readonly scope: string; readonly exclusions?: readonly string[] },
+): LocalEngagement | undefined => {
+  const exclusions = [...(match.exclusions ?? [])].sort()
+  return engagements.find((engagement) => {
+    const engagementExclusions = [...engagement.scope.target.exclusions].sort()
+    return (
+      (engagement.status === "authorized" || engagement.status === "active") &&
+      engagement.directory === match.directory &&
+      engagement.scope.target.name === match.target &&
+      engagement.scope.target.scope === match.scope &&
+      engagementExclusions.length === exclusions.length &&
+      engagementExclusions.every((value, i) => value === exclusions[i])
+    )
+  })
+}
+
 const toLocal = (row: typeof EngagementLocalTable.$inferSelect): LocalEngagement => ({
   id: row.id,
   name: row.name,

@@ -7,3 +7,16 @@ build
 coverage
 *.log
 .DS_Store
+
+# Engagement artifacts (pentest output, credentials, session state) — never committed
+*.bak
+cookies.txt
+csrf_token*.txt
+hydra.restore
+buypin-*
+ctax-*
+home.html
+vulnerability-report-*.md
+PENTEST_REPORT.md
+REPORT.md
+penetration-test-report.md
