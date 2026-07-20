@@ -293,6 +293,14 @@ export const RunCommand = effectCmd({
     // the same target (including the same --exclude set) reuse one engagement record. Remote
     // (--attach) authorization stays server-side.
     let bindEngagement: ((sessionID: string) => Effect.Effect<void>) | undefined
+    if (args.target && args.engagement) {
+      // --target binds the session to a freshly-authorized LOCAL engagement; --engagement links it
+      // to an existing HOSTED one. Letting both through would have the local bind silently
+      // overwrite the hosted linkage the operator explicitly asked for — fail fast instead of
+      // guessing which authorization record should win.
+      UI.error("--target and --engagement are mutually exclusive: --target authorizes a new local engagement, --engagement links to an existing hosted one.")
+      process.exit(1)
+    }
     if (args.target && !args.attach) {
       const store = yield* EngagementStore.Service
       // Mirror the session's own directory resolution below (PWD-aware root, args.dir resolved

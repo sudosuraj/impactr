@@ -48,6 +48,30 @@ describe("TechniqueParse", () => {
     expect(parsed.relations).toContainEqual({ source: "subdomain:api.example.com", target: "endpoint:https://api.example.com", relation: "exposes" })
   })
 
+  test("nuclei links a vulnerability to the matched endpoint via vulnerable_to", () => {
+    const parsed = TechniqueParse.nuclei(
+      '{"template-id":"sqli-1","info":{"name":"SQL Injection","severity":"critical","tags":["sqli"]},"matched-at":"https://api.example.com/login","host":"api.example.com","type":"http"}',
+    )
+    const vuln = parsed.assets.find((a) => a.type === "vulnerability")
+    expect(vuln).toMatchObject({ label: "SQL Injection [critical]", attributes: { severity: "critical", templateId: "sqli-1" } })
+    expect(parsed.relations).toContainEqual({
+      source: "endpoint:https://api.example.com/login",
+      target: vuln!.id,
+      relation: "vulnerable_to",
+      attributes: { severity: "critical" },
+    })
+  })
+
+  test("nuclei falls back to host when matched-at isn't a URL, typing a bare IP as ip not subdomain", () => {
+    const hostname = TechniqueParse.nuclei('{"template-id":"t1","info":{"severity":"low"},"host":"api.example.com","type":"tcp"}')
+    expect(hostname.assets.find((a) => a.type === "subdomain")).toMatchObject({ label: "api.example.com" })
+
+    const ip = TechniqueParse.nuclei('{"template-id":"t2","info":{"severity":"low"},"host":"10.0.0.1","type":"tcp"}')
+    const ipAsset = ip.assets.find((a) => a.label === "10.0.0.1")
+    expect(ipAsset).toMatchObject({ type: "ip", id: "ip:10.0.0.1" })
+    expect(ip.assets.some((a) => a.type === "subdomain")).toBe(false)
+  })
+
   test("katana and urlList collect endpoint urls", () => {
     expect(TechniqueParse.katana('{"endpoint":"https://x/a"}\nhttps://x/b').assets.map((a) => a.label).sort()).toEqual([
       "https://x/a",

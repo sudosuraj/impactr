@@ -59,7 +59,9 @@ export const QueueHypothesisTool = Tool.define(
           plan: objectives,
         })
         const rel = "findings/ENGAGEMENT-REPORT.md"
-        yield* fs.writeWithDirs(path.join(session.directory, rel), content).pipe(Effect.catch(() => Effect.void))
+        // No inner catch: a write failure must propagate to the outer catch below (→ undefined),
+        // not be swallowed here — otherwise the caller reports the report as written when it isn't.
+        yield* fs.writeWithDirs(path.join(session.directory, rel), content)
         return rel
       }).pipe(Effect.catch(() => Effect.succeed(undefined)))
 

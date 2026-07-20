@@ -21,11 +21,13 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export function AttackGraphMap(props: { nodes: MapNode[]; edges: MapEdge[] }) {
-  const layout = createMemo(() => computeLayout(props.nodes, props.edges))
-
   const [view, setView] = createSignal<ViewBox | undefined>()
   const [selected, setSelected] = createSignal<string | undefined>()
   const [hovered, setHovered] = createSignal<string | undefined>()
+
+  // Depends on `selected()` so a selection past the per-column cap stays visible in its column
+  // instead of being silently dropped (see computeLayout's selectedId parameter).
+  const layout = createMemo(() => computeLayout(props.nodes, props.edges, selected()))
 
   // Frame the graph once we have geometry, and keep the user's pan/zoom across live refreshes.
   // Only re-fit when there is no view yet, so incoming data never yanks the camera mid-inspection.

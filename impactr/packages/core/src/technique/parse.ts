@@ -162,8 +162,11 @@ export const nuclei = (stdout: string): Parsed => {
       assets.set(endpointId(matchedAt), { id: endpointId(matchedAt), type: "endpoint", label: matchedAt })
       relations.push({ source: endpointId(matchedAt), target: vid, relation: "vulnerable_to", attributes: { severity } })
     } else if (host) {
-      assets.set(subdomainId(host), { id: subdomainId(host), type: "subdomain", label: host })
-      relations.push({ source: subdomainId(host), target: vid, relation: "vulnerable_to", attributes: { severity } })
+      // Mirror naabu's handling: a bare IP host is an `ip` node, not a `subdomain` — mislabeling it
+      // would misrepresent network assets in the attack graph.
+      const hostAsset: Asset = isIpv4(host) ? { id: ipId(host), type: "ip", label: host } : { id: subdomainId(host), type: "subdomain", label: host }
+      assets.set(hostAsset.id, hostAsset)
+      relations.push({ source: hostAsset.id, target: vid, relation: "vulnerable_to", attributes: { severity } })
     }
   }
   return { assets: [...assets.values()], relations }

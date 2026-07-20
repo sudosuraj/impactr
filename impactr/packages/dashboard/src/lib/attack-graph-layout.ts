@@ -66,12 +66,22 @@ const MARGIN_X = 70
 const MARGIN_Y = 34
 const PER_LAYER = 20
 
-/** Deterministically place nodes into typed columns and route edges between placed endpoints. */
-export const computeLayout = (nodes: ReadonlyArray<LayoutNode>, edges: ReadonlyArray<LayoutEdge>): Layout => {
-  const layers = LAYER_ORDER.map((type) => ({
-    type,
-    nodes: nodes.filter((n) => n.type === type).slice(0, PER_LAYER),
-  })).filter((l) => l.nodes.length > 0)
+/**
+ * Deterministically place nodes into typed columns and route edges between placed endpoints.
+ * `selectedId`, if given, is guaranteed a slot in its column even past the per-column cap —
+ * otherwise selecting a node past the cap (or a refresh pushing it past the cap) would silently
+ * drop it from the layout and clear the selection.
+ */
+export const computeLayout = (nodes: ReadonlyArray<LayoutNode>, edges: ReadonlyArray<LayoutEdge>, selectedId?: string): Layout => {
+  const layers = LAYER_ORDER.map((type) => {
+    const typeNodes = nodes.filter((n) => n.type === type)
+    const capped = typeNodes.slice(0, PER_LAYER)
+    if (selectedId !== undefined && !capped.some((n) => n.id === selectedId)) {
+      const selectedNode = typeNodes.find((n) => n.id === selectedId)
+      if (selectedNode) capped.splice(PER_LAYER - 1, 1, selectedNode)
+    }
+    return { type, nodes: capped }
+  }).filter((l) => l.nodes.length > 0)
 
   const cols = layers.length
   const maxRows = Math.max(1, ...layers.map((l) => l.nodes.length))

@@ -46,6 +46,22 @@ describe("computeLayout", () => {
     expect(e.b.id).toBe("p1")
     expect(typeof e.a.x).toBe("number")
   })
+
+  test("a column beyond the per-layer cap drops the excess, but keeps a selected node visible", () => {
+    const manySubdomains: LayoutNode[] = Array.from({ length: 25 }, (_, i) => ({
+      id: `s${i}`,
+      type: "subdomain",
+      label: `s${i}.acme.com`,
+      status: "pending",
+    }))
+    const withoutSelection = computeLayout(manySubdomains, [])
+    expect(withoutSelection.placed.some((p) => p.id === "s24")).toBe(false)
+
+    const withSelection = computeLayout(manySubdomains, [], "s24")
+    expect(withSelection.placed.some((p) => p.id === "s24")).toBe(true)
+    // Still capped at 20 for that column — the selected node replaces the last slot, not appended.
+    expect(withSelection.layers.find((l) => l.type === "subdomain")?.nodes).toHaveLength(20)
+  })
 })
 
 describe("neighborIds / edgeTouches", () => {
