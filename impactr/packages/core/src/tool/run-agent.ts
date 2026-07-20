@@ -325,11 +325,13 @@ const layer = Layer.effectDiscard(
                 const job = yield* backgroundJobs.start({
                   type: "subagent",
                   title: `Subagent: ${input.agent}`,
-                  // Event-driven signal back to the delegator: when the background subagent settles,
-                  // admit its synthesis into the parent session as a queued input, then wake the
-                  // parent so it's delivered immediately rather than sitting until some unrelated
-                  // prompt happens to promote it — the parent may well have already gone idle by
-                  // the time this background job finishes.
+                  // Event-driven signal back to the delegator: when the background subagent settles
+                  // — success OR failure — admit a report into the parent session as a queued input,
+                  // then wake the parent so it's delivered immediately rather than sitting until some
+                  // unrelated prompt happens to promote it. Failure is tapped too (not just success):
+                  // without it, a subagent that errors or is interrupted leaves the delegator waiting
+                  // indefinitely for a report that never arrives, contradicting the tool's own promise
+                  // below that a report "will be delivered ... when it finishes."
                   run: runSubagent({ agent: input.agent, prompt: input.prompt }, context).pipe(
                     Effect.tap((output) =>
                       SessionInput.admit(db, events, {
@@ -341,7 +343,18 @@ const layer = Layer.effectDiscard(
                         delivery: "queue",
                       }),
                     ),
+                    Effect.tapError((err) =>
+                      SessionInput.admit(db, events, {
+                        id: SessionMessage.ID.create(),
+                        sessionID: parentSessionID,
+                        prompt: Prompt.make({
+                          text: `Background subagent '${input.agent}' failed: ${err instanceof Error ? err.message : String(err)}`,
+                        }),
+                        delivery: "queue",
+                      }),
+                    ),
                     Effect.tap(() => execution.wake(parentSessionID)),
+                    Effect.tapError(() => execution.wake(parentSessionID)),
                   ),
                 })
                 return {

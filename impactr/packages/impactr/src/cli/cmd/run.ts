@@ -295,7 +295,11 @@ export const RunCommand = effectCmd({
     let bindEngagement: ((sessionID: string) => Effect.Effect<void>) | undefined
     if (args.target && !args.attach) {
       const store = yield* EngagementStore.Service
-      const directory = args.dir ? path.resolve(process.cwd(), args.dir) : process.cwd()
+      // Mirror the session's own directory resolution below (PWD-aware root, args.dir resolved
+      // against it) rather than a bare process.cwd() — they must key on the same directory for
+      // findReusable/resolveForSession to agree when PWD and cwd diverge (e.g. after a symlinked cd).
+      const runRoot = Filesystem.resolve(process.env.PWD ?? process.cwd())
+      const directory = args.dir ? path.resolve(runRoot, args.dir) : runRoot
       const scope = args.scope ?? args.target
       const exclusions = (args.exclude ?? []).map((entry) => entry.trim()).filter((entry) => entry.length > 0)
       const existing = EngagementStore.findReusable(yield* store.list(), { directory, target: args.target, scope, exclusions })

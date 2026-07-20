@@ -39,6 +39,17 @@ describe("AsmAssetClassify.classifyToken", () => {
     })
   })
 
+  test("classifies a URL with a bare IP host without a nonsensical root", () => {
+    expect(AsmAssetClassify.classifyToken("https://10.0.0.1/admin")).toEqual({
+      type: "url",
+      value: "https://10.0.0.1/admin",
+    })
+    expect(AsmAssetClassify.classifyToken("https://[::1]:8443/")).toEqual({
+      type: "url",
+      value: "https://[::1]:8443",
+    })
+  })
+
   test("lower-cases hostnames and strips a trailing dot", () => {
     expect(AsmAssetClassify.classifyToken("API.Acme.COM.")).toEqual({
       type: "subdomain",

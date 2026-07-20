@@ -29,6 +29,9 @@ const HOSTNAME = /^(?=.{1,253}$)([a-z0-9](-*[a-z0-9])*\.)+[a-z]{2,}$/
 
 const octetsInRange = (parts: ReadonlyArray<string>) => parts.every((p) => Number(p) <= 255)
 
+/** True for a bare IPv4/IPv6 host (brackets stripped) — an IP has no registrable root to compute. */
+const isIpHost = (host: string): boolean => IPV4.test(host) || IPV6.test(host.replace(/^\[|\]$/g, ""))
+
 /** The registrable root domain (last two labels) of a hostname — a coarse eTLD-agnostic reduction. */
 const rootOf = (host: string): string => {
   const labels = host.split(".")
@@ -46,7 +49,11 @@ export const classifyToken = (raw: string): SeedAsset | undefined => {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(token)) {
     try {
       const url = new URL(token)
-      return { type: "url", value: url.origin.toLowerCase() + (url.pathname === "/" ? "" : url.pathname), root: rootOf(url.hostname.toLowerCase()) }
+      const hostname = url.hostname.toLowerCase()
+      const value = url.origin.toLowerCase() + (url.pathname === "/" ? "" : url.pathname)
+      // A bare IP host has no registrable root — computing one from dotted octets would produce
+      // a nonsensical OSINT target (e.g. rootOf("10.0.0.1") => "0.1").
+      return isIpHost(hostname) ? { type: "url", value } : { type: "url", value, root: rootOf(hostname) }
     } catch {
       return undefined
     }

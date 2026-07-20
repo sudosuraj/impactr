@@ -2,11 +2,13 @@ import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
 import { AttackGraph } from "@impactr-ai/core/attack-graph/graph"
 import type { NodeType, NodeStatus, EdgeRelation } from "@impactr-ai/core/attack-graph/schema"
+import { findChains, renderChains } from "./attack-chains"
 import { Session } from "@/session/session"
 import { engagementRoot } from "./engagement-session"
 
 export const Parameters = Schema.Struct({
-  action: Schema.Literals(["add_node", "add_edge", "update_status", "query", "get_node"]).annotate({ description: "The action to perform." }),
+  action: Schema.Literals(["add_node", "add_edge", "update_status", "query", "get_node", "chains"]).annotate({ description: "The action to perform." }),
+  limit: Schema.optional(Schema.Number).annotate({ description: "For 'chains': max number of chains to return (default 15)." }),
   nodeId: Schema.optional(Schema.String).annotate({ description: "Unique identifier for the node (e.g., 'ip:192.168.1.1', 'port:80', 'endpoint:/api/login')." }),
   nodeType: Schema.optional(Schema.Literals(["ip", "port", "subdomain", "endpoint", "credential", "vulnerability"])).annotate({ description: "The type of the node." }),
   nodeLabel: Schema.optional(Schema.String).annotate({ description: "Human-readable label for the node." }),
@@ -23,9 +25,9 @@ export const AttackGraphTool = Tool.define(
     const graph = yield* AttackGraph
     const sessions = yield* Session.Service
     return {
-    description: "Interact with the session's Attack Graph — your persistent map of discovered assets and their state. Add nodes (targets, findings), add edges (relationships), update node status, or query the graph to understand your current pentesting state. The technique tools also populate this graph, so it is the single shared source of truth.",
+    description: "Interact with the session's Attack Graph — your persistent map of discovered assets and their state. Add nodes (targets, findings), add edges (relationships), update node status, query the graph to understand your current pentesting state, or surface exploit chains — composed paths like subdomain --exposes--> endpoint --vulnerable_to--> RCE, ranked by severity. The technique tools also populate this graph, so it is the single shared source of truth.",
     parameters: Parameters,
-    execute: ({ action, nodeId, nodeType, nodeLabel, nodeAttributes, nodeStatus, source, target, relation }, ctx) => Effect.gen(function* () {
+    execute: ({ action, nodeId, nodeType, nodeLabel, nodeAttributes, nodeStatus, source, target, relation, limit }, ctx) => Effect.gen(function* () {
       const sid = yield* engagementRoot(sessions, ctx.sessionID as string)
       if (action === "add_node") {
         if (!nodeId || !nodeType || !nodeLabel || !nodeStatus) return "Error: nodeId, nodeType, nodeLabel, and nodeStatus are required to add a node."
@@ -77,6 +79,12 @@ export const AttackGraphTool = Tool.define(
         const compromised = nodes.filter((n) => n.status === "compromised").map((n) => n.id)
         const active = nodes.filter((n) => n.status === "enumerating" || n.status === "exploiting").map((n) => n.id)
         return `Attack Graph Summary:\nTotal Nodes: ${nodes.length} | Total Edges: ${state.edges.length}\nStatus: ${statusLine || "none"}${list("Compromised", compromised)}${list("Active", active)}\n\n(Use get_node <id> for a node's full detail and neighbors.)`
+      }
+
+      if (action === "chains") {
+        const state = yield* graph.getGraph(sid)
+        const chains = findChains(state, limit ?? 15)
+        return renderChains(chains)
       }
 
       return "Unknown action."

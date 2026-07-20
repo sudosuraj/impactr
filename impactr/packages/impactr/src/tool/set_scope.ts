@@ -37,7 +37,7 @@ Only ever pass a target the OPERATOR explicitly gave you in their own instructio
 
           // Reuse an existing still-valid authorization for the same directory+scope so re-stating
           // the target doesn't pile up duplicate engagement records.
-          const existing = EngagementStore.findReusable(yield* store.list(), { directory, target, scope })
+          const existing = EngagementStore.findReusable(yield* store.list(), { directory, target, scope, exclusions })
           const engagement =
             existing ??
             (yield* store.authorize({ name: `Pentest: ${target}`, target, scope, exclusions, directory }))
