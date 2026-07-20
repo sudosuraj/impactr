@@ -78,7 +78,7 @@ This is the **Continuous Discovery Engine**: it keeps a session running autonomo
 
 All agents are defined **once**, in code, at `packages/impactr/src/agent/agent.ts` (permissions) with prompts in `packages/impactr/src/agent/prompt/*.txt`. There is no separate `.md`/`.json` agent-definition system anymore — the old parallel one was deleted, since it never loaded and only caused drift.
 
-- **`attack`** (primary, prompt `orchestrator.txt`) — the full-engagement orchestrator: plans strategy, owns the Attack Graph, delegates heavy work to subagents via the `task` tool. Broad permission (`*: allow`) minus a few denies.
+- **`attack`** (primary, prompt `orchestrator.txt`) — the full-engagement orchestrator: plans strategy, owns the Attack Graph, delegates heavy work to subagents via the `task` tool. Deny-by-default permission (`*: deny`) with an explicit allow-list for strategy/scope/graph/delegation tools only — it runs no shell, edit, webfetch, or technique tools itself; every concrete action against the target is delegated to a subagent.
 - **`recon`** (primary, prompt `recon.txt`) — reconnaissance-only entry agent; maps surface, never exploits.
 - **`enumerate`** (subagent, prompt `enumerate.txt`) — deep active enumeration/fuzzing via the technique tools; spawned by `attack`.
 - **`exploit`** (subagent, prompt `exploit.txt`) — proves out one specific discovered vulnerability; spawned by `attack`.

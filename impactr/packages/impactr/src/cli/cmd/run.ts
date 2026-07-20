@@ -288,10 +288,14 @@ export const RunCommand = effectCmd({
     const localInstance = yield* InstanceRef
 
     // Scope from target: launching a local run with --target IS the operator's authorization act,
-    // so get_scope resolves instead of telling the agent "no scope is configured". Scoped to the
-    // run directory (the same key resolveForSession falls back on), and deduped so repeated runs of
-    // the same target (including the same --exclude set) reuse one engagement record. Remote
-    // (--attach) authorization stays server-side.
+    // so get_scope resolves instead of telling the agent "no scope is configured". Deduped so
+    // repeated runs of the same target (including the same --exclude set) reuse one engagement
+    // record. Remote (--attach) authorization stays server-side. Only the mutual-exclusion check
+    // and service resolution happen here — the actual authorize/bind (a DB write, plus a console
+    // confirmation) is deferred into the async block below, *after* input validation, so a launch
+    // that's going to abort anyway (empty message, --fork without --continue/--session, a bad
+    // --dir) never creates a stray authorization record or prints a misleading "Authorized scope"
+    // line for a run that didn't happen.
     let bindEngagement: ((sessionID: string) => Effect.Effect<void>) | undefined
     if (args.target && args.engagement) {
       // --target binds the session to a freshly-authorized LOCAL engagement; --engagement links it
@@ -301,36 +305,7 @@ export const RunCommand = effectCmd({
       UI.error("--target and --engagement are mutually exclusive: --target authorizes a new local engagement, --engagement links to an existing hosted one.")
       process.exit(1)
     }
-    if (args.target && !args.attach) {
-      const store = yield* EngagementStore.Service
-      // Mirror the session's own directory resolution below (PWD-aware root, args.dir resolved
-      // against it) rather than a bare process.cwd() — they must key on the same directory for
-      // findReusable/resolveForSession to agree when PWD and cwd diverge (e.g. after a symlinked cd).
-      const runRoot = Filesystem.resolve(process.env.PWD ?? process.cwd())
-      const directory = args.dir ? path.resolve(runRoot, args.dir) : runRoot
-      const scope = args.scope ?? args.target
-      const exclusions = (args.exclude ?? []).map((entry) => entry.trim()).filter((entry) => entry.length > 0)
-      const existing = EngagementStore.findReusable(yield* store.list(), { directory, target: args.target, scope, exclusions })
-      const engagement =
-        existing ??
-        (yield* store.authorize({
-          name: `Pentest: ${args.target}`,
-          target: args.target,
-          scope,
-          exclusions,
-          directory,
-        }))
-      yield* Effect.sync(() =>
-        UI.println(
-          `${existing ? "Using authorized" : "Authorized"} scope for ${engagement.scope.target.name} — ${engagement.scope.target.scope}` +
-            (exclusions.length > 0 ? ` (excluding ${exclusions.join(", ")})` : ""),
-        ),
-      )
-      // Bind explicitly rather than relying on resolveForSession's directory fallback: an already-
-      // bound (--continue/--session) session would otherwise keep its old engagement's scope even
-      // though the operator just passed a different --target on this invocation.
-      bindEngagement = (sessionID) => store.bindSession(sessionID as any, engagement.id)
-    }
+    const engagementStore = args.target && !args.attach ? yield* EngagementStore.Service : undefined
     yield* Effect.promise(async () => {
       const rawMessage = [...args.message, ...(args["--"] || [])].join(" ")
       const interactive = args.mini
@@ -488,6 +463,42 @@ export const RunCommand = effectCmd({
       if (args.fork && !args.continue && !args.session) {
         UI.error("--fork requires --continue or --session")
         process.exit(1)
+      }
+
+      // Deferred from the top of the handler (see comment there): validation above has now passed,
+      // so this launch is actually going to run — safe to authorize (a DB write) and confirm.
+      if (engagementStore && args.target) {
+        const target = args.target
+        const scope = args.scope ?? target
+        const exclusions = (args.exclude ?? []).map((entry) => entry.trim()).filter((entry) => entry.length > 0)
+        const targetDirectory = directory ?? root
+        const { engagement, reused } = await Effect.runPromise(
+          Effect.gen(function* () {
+            const existing = EngagementStore.findReusable(yield* engagementStore.list(), {
+              directory: targetDirectory,
+              target,
+              scope,
+              exclusions,
+            })
+            if (existing) return { engagement: existing, reused: true }
+            const created = yield* engagementStore.authorize({
+              name: `Pentest: ${target}`,
+              target,
+              scope,
+              exclusions,
+              directory: targetDirectory,
+            })
+            return { engagement: created, reused: false }
+          }),
+        )
+        UI.println(
+          `${reused ? "Using authorized" : "Authorized"} scope for ${engagement.scope.target.name} — ${engagement.scope.target.scope}` +
+            (exclusions.length > 0 ? ` (excluding ${exclusions.join(", ")})` : ""),
+        )
+        // Bind explicitly rather than relying on resolveForSession's directory fallback: an already-
+        // bound (--continue/--session) session would otherwise keep its old engagement's scope even
+        // though the operator just passed a different --target on this invocation.
+        bindEngagement = (sessionID) => engagementStore.bindSession(sessionID as any, engagement.id)
       }
 
       const rules: PermissionV1.Ruleset = interactive
