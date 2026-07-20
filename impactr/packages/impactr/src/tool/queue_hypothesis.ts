@@ -42,7 +42,7 @@ export const QueueHypothesisTool = Tool.define(
     // findings/ENGAGEMENT-REPORT.md. Deterministic (no LLM) and idempotent (overwrites), so it's
     // safe to (re)generate at every wind-down. Returns the relative path, or undefined when there's
     // nothing to report or the working directory can't be resolved.
-    const writeReport = (sid: string, conclusion: "saturated" | "budget-exhausted") =>
+    const writeReport = (sid: string, conclusion: EngagementReport.Conclusion) =>
       Effect.gen(function* () {
         const findings = yield* graph.summarize(sid, 200)
         const graphState = yield* attackGraph.getGraph(sid)
@@ -78,9 +78,12 @@ export const QueueHypothesisTool = Tool.define(
             const next = yield* queue.popHighestPriority(sid)
             if (!next) {
               // Backlog drained — the engagement is winding down. Auto-synthesize the consolidated
-              // report now, deterministically, so a run always ends with a readable artifact.
+              // report now, deterministically, so a run always ends with a readable artifact. This
+              // path has no budget signal to check (unlike the hosted runner), so an empty-but-not-
+              // saturated backlog is labeled "backlog-drained", not "budget-exhausted" — the budget
+              // was never consulted, so claiming it was exhausted would be a fabricated conclusion.
               const saturated = yield* saturation.isSaturated(sid).pipe(Effect.catch(() => Effect.succeed(false)))
-              const report = yield* writeReport(sid, saturated ? "saturated" : "budget-exhausted")
+              const report = yield* writeReport(sid, saturated ? "saturated" : "backlog-drained")
               const reportLine = report ? ` Consolidated engagement report written to ${report}.` : ""
               return saturated
                 ? `Backlog empty and knowledge saturated — the engagement is concluding.${reportLine} Do a final skim of the attack graph; if nothing new remains, you are done.`

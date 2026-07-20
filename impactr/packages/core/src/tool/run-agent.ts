@@ -11,7 +11,7 @@ import {
   ToolFailure,
   type ToolCall,
 } from "@impactr-ai/llm"
-import { Clock, Effect, Layer, Schema, Stream } from "effect"
+import { Cause, Clock, Effect, Exit, Layer, Schema, Stream } from "effect"
 import { makeLocationNode } from "../effect/app-node"
 import { llmClient } from "../effect/app-node-platform"
 import { AgentV2 } from "../agent"
@@ -328,33 +328,33 @@ const layer = Layer.effectDiscard(
                   // Event-driven signal back to the delegator: when the background subagent settles
                   // — success OR failure — admit a report into the parent session as a queued input,
                   // then wake the parent so it's delivered immediately rather than sitting until some
-                  // unrelated prompt happens to promote it. Failure is tapped too (not just success):
-                  // without it, a subagent that errors or is interrupted leaves the delegator waiting
-                  // indefinitely for a report that never arrives, contradicting the tool's own promise
-                  // below that a report "will be delivered ... when it finishes."
+                  // unrelated prompt happens to promote it. Failure is reported too (not just
+                  // success): without it, a subagent that errors or is interrupted leaves the
+                  // delegator waiting indefinitely for a report that never arrives, contradicting the
+                  // tool's own promise below that a report "will be delivered ... when it finishes."
+                  //
+                  // Captured via Effect.exit rather than a tap/tapError pair so the two concerns stay
+                  // decoupled: the notification itself (admit + wake) can fail without that failure
+                  // masquerading as a subagent failure or corrupting this background job's own
+                  // success/failure bookkeeping, and exactly one notification fires per outcome. The
+                  // original exit is replayed unchanged at the end via `yield* exit`.
                   run: runSubagent({ agent: input.agent, prompt: input.prompt }, context).pipe(
-                    Effect.tap((output) =>
-                      SessionInput.admit(db, events, {
+                    Effect.exit,
+                    Effect.tap((exit) => {
+                      const text = Exit.isSuccess(exit)
+                        ? `Background subagent '${input.agent}' finished. Its report:\n\n${exit.value}`
+                        : `Background subagent '${input.agent}' failed: ${Cause.pretty(exit.cause)}`
+                      return SessionInput.admit(db, events, {
                         id: SessionMessage.ID.create(),
                         sessionID: parentSessionID,
-                        prompt: Prompt.make({
-                          text: `Background subagent '${input.agent}' finished. Its report:\n\n${output}`,
-                        }),
+                        prompt: Prompt.make({ text }),
                         delivery: "queue",
-                      }),
-                    ),
-                    Effect.tapError((err) =>
-                      SessionInput.admit(db, events, {
-                        id: SessionMessage.ID.create(),
-                        sessionID: parentSessionID,
-                        prompt: Prompt.make({
-                          text: `Background subagent '${input.agent}' failed: ${err instanceof Error ? err.message : String(err)}`,
-                        }),
-                        delivery: "queue",
-                      }),
-                    ),
-                    Effect.tap(() => execution.wake(parentSessionID)),
-                    Effect.tapError(() => execution.wake(parentSessionID)),
+                      }).pipe(
+                        Effect.flatMap(() => execution.wake(parentSessionID)),
+                        Effect.catch(() => Effect.void),
+                      )
+                    }),
+                    Effect.flatMap((exit) => exit),
                   ),
                 })
                 return {

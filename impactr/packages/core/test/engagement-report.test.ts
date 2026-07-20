@@ -46,6 +46,12 @@ describe("EngagementReport.render", () => {
     expect(md).toContain("Session budget exhausted.")
   })
 
+  test("labels a drained hypothesis backlog distinctly from budget exhaustion", () => {
+    const md = baseInput({ conclusion: "backlog-drained" })
+    expect(md).toContain("Hypothesis backlog empty")
+    expect(md).not.toContain("Session budget exhausted.")
+  })
+
   test("summarizes asset, compromise, and finding counts", () => {
     const graph: GraphState = {
       nodes: {

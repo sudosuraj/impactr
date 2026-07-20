@@ -13,7 +13,7 @@ import { makeLocationNode } from "../effect/app-node"
 import path from "path"
 
 /** Why the autonomous engine wound the engagement down — surfaced in the report header. */
-export type Conclusion = "saturated" | "budget-exhausted"
+export type Conclusion = "saturated" | "budget-exhausted" | "backlog-drained"
 
 /** Everything the renderer needs, gathered once so the render stays a pure function. */
 export interface ReportInput {
@@ -34,6 +34,7 @@ export interface Report {
 const CONCLUSION_LABEL: Record<Conclusion, string> = {
   saturated: "Knowledge saturated — discovery rate fell below the continue threshold.",
   "budget-exhausted": "Session budget exhausted.",
+  "backlog-drained": "Hypothesis backlog empty — no further leads queued.",
 }
 
 /** Coarse severity band from a finding's assessed impact, used only for grouping the report. */

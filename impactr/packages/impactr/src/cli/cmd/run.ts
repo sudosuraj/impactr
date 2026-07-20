@@ -508,7 +508,23 @@ export const RunCommand = effectCmd({
         return message.slice(0, 50) + (message.length > 50 ? "..." : "")
       }
 
+      // Every code path that resolves or mints a session ID for this invocation funnels through
+      // `session()` (resolve/fork/continue/default-create) or `createFreshSession()` (interactive
+      // /new) — binding once here, rather than at each call site, is what makes it apply uniformly,
+      // including the interactive-local-mode path that never calls `execute()` (and so would
+      // otherwise miss the explicit bind entirely, silently falling back to resolveForSession's
+      // directory-latest guess instead of the target the operator just passed).
+      const bindIfTargeted = async (sessionID: string | undefined) => {
+        if (sessionID && bindEngagement) await Effect.runPromise(bindEngagement(sessionID))
+      }
+
       async function session(sdk: ImpactrClient): Promise<SessionInfo | undefined> {
+        const resolved = await sessionImpl(sdk)
+        await bindIfTargeted(resolved?.id)
+        return resolved
+      }
+
+      async function sessionImpl(sdk: ImpactrClient): Promise<SessionInfo | undefined> {
         if (args.session) {
           const current = await sdk.session
             .get({
@@ -626,6 +642,7 @@ export const RunCommand = effectCmd({
         }
 
         void share(sdk, id).catch(() => {})
+        await bindIfTargeted(id)
         return {
           id,
           title: result.data?.title,
@@ -731,10 +748,6 @@ export const RunCommand = effectCmd({
           process.exit(1)
         }
         const sessionID = sess.id
-
-        if (bindEngagement) {
-          await Effect.runPromise(bindEngagement(sessionID))
-        }
 
         function emit(type: string, data: Record<string, unknown>) {
           if (args.format === "json") {
