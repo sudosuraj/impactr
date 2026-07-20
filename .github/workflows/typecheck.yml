@@ -1,0 +1,33 @@
+name: typecheck
+
+# GitHub Actions only discovers workflows under <repo-root>/.github/workflows — this repo's
+# git root is one level above the impactr/ application (see CLAUDE.md), so this file must live
+# here, not under impactr/.github/workflows (a copy exists there but is never run by GitHub).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: impactr
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: impactr/package.json
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run typecheck
+        run: bun typecheck
