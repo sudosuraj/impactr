@@ -52,6 +52,11 @@ jobs:
         id: cache
         run: echo "dir=$(bun pm cache)" >> "$GITHUB_OUTPUT"
 
+      # Python 3.12+ dropped distutils, which some native (node-gyp) postinstall builds still
+      # expect via setuptools' shim. Best-effort, matching the composite action.
+      - name: Install setuptools for distutils compatibility
+        run: python3 -m pip install setuptools || pip install setuptools || true
+
       - name: Restore Bun dependencies
         id: bun-cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
