@@ -20,6 +20,9 @@ export const Input = Schema.Struct({
   path: RelativePath.pipe(Schema.optional).annotate({
     description: "Relative directory to search. Defaults to the active Location.",
   }),
+  exclude: Schema.String.pipe(Schema.optional).annotate({
+    description: 'File pattern to exclude from the search (for example, "*.log", "node_modules/**")',
+  }),
   limit: FileSystem.GlobInput.fields.limit.annotate({
     description: "Maximum results to return",
   }),
@@ -66,6 +69,7 @@ const layer = Layer.effectDiscard(
                 metadata: {
                   root: input.path ?? ".",
                   path: input.path,
+                  exclude: input.exclude,
                   limit: input.limit,
                 },
                 sessionID: context.sessionID,
@@ -77,6 +81,7 @@ const layer = Layer.effectDiscard(
                 .glob({
                   cwd,
                   pattern: input.pattern,
+                  exclude: input.exclude,
                   limit: input.limit ?? Number.MAX_SAFE_INTEGER,
                 })
                 .pipe(

@@ -26,6 +26,12 @@ export const Input = Schema.Struct({
   include: FileSystem.GrepInput.fields.include.annotate({
     description: 'File glob to include in the search (for example, "*.js" or "*.{ts,tsx}")',
   }),
+  exclude: Schema.String.pipe(Schema.optional).annotate({
+    description: 'File glob to exclude from the search (for example, "*.log", "node_modules/**")',
+  }),
+  ignoreCase: Schema.Boolean.pipe(Schema.optional).annotate({
+    description: "Perform a case-insensitive search",
+  }),
   limit: FileSystem.GrepInput.fields.limit.annotate({
     description: "Maximum matches to return",
   }),
@@ -86,6 +92,8 @@ const layer = Layer.effectDiscard(
                   root: ".",
                   path: input.path,
                   include: input.include,
+                  exclude: input.exclude,
+                  ignoreCase: input.ignoreCase,
                   limit: input.limit,
                 },
                 sessionID: context.sessionID,
@@ -100,6 +108,8 @@ const layer = Layer.effectDiscard(
                   pattern: input.pattern,
                   file: info?.type === "File" ? path.basename(target) : undefined,
                   include: input.include,
+                  exclude: input.exclude,
+                  ignoreCase: input.ignoreCase,
                   limit: input.limit ?? Number.MAX_SAFE_INTEGER,
                 })
                 .pipe(
