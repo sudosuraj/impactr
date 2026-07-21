@@ -9,9 +9,8 @@ import { KnowledgeSaturation, node as KnowledgeSaturationNode } from "../session
 import { Location } from "../location"
 import { PermissionV2 } from "../permission"
 import { AppProcess } from "../process"
-import { TechniqueParse } from "../technique/parse"
 import { TechniqueIngest } from "../technique/ingest"
-import type { Parsed } from "../technique/asset"
+import { techniqueSpecs } from "../technique/specs"
 import { ToolRegistry } from "./registry"
 import { Tool } from "./tool"
 import { Tools } from "./tools"
@@ -23,98 +22,33 @@ import { Tools } from "./tools"
  * graph state, not raw tool transcripts — which also means these tools are injection-safe by
  * construction: target bytes become typed nodes, never free text echoed back into context.
  *
- * The parsers (technique/parse.ts) are the reusable, tested core; a tool is just {engine, argv,
- * parser}. The engine shell-out is graceful: a missing binary yields an advisory digest, not a crash.
+ * The spec list (technique/specs.ts) is the single source of truth for which techniques exist and
+ * what arguments they build, shared with the CLI tool wrapper so the two can't drift onto different
+ * sets of techniques. The engine shell-out is graceful: a missing binary yields an advisory digest,
+ * not a crash.
  */
 
 const MAX_CAPTURE_BYTES = 5 * 1024 * 1024
 const ENGINE_TIMEOUT = Duration.minutes(5)
 
-interface Spec {
-  readonly name: string
-  readonly engine: string
-  readonly description: string
-  readonly buildArgs: (target: string) => ReadonlyArray<string>
-  readonly parse: (stdout: string) => Parsed
-}
-
-// Best-effort invocations of the standard toolkit. Flags are the expected form; the parser is what
-// makes the tool correct, and it tolerates both the JSON and plain-text output modes of each engine.
-const SPECS: ReadonlyArray<Spec> = [
-  {
-    name: "enumerate_subdomains",
-    engine: "subfinder",
-    description: "Enumerate subdomains of a root domain (passive + active). Target: a domain. Results land in the Attack Graph.",
-    buildArgs: (t) => ["-silent", "-json", "-d", t],
-    parse: TechniqueParse.subfinder,
-  },
-  {
-    name: "resolve_dns",
-    engine: "dnsx",
-    description: "Resolve a host's DNS records (A/AAAA/CNAME) and map resolutions. Target: a hostname.",
-    buildArgs: (t) => ["-silent", "-json", "-a", "-aaaa", "-cname", "-d", t],
-    parse: TechniqueParse.dnsx,
-  },
-  {
-    name: "scan_ports",
-    engine: "naabu",
-    description: "Discover open ports and services on a host. Target: a host or IP.",
-    buildArgs: (t) => ["-silent", "-json", "-host", t],
-    parse: TechniqueParse.naabu,
-  },
-  {
-    name: "probe_http",
-    engine: "httpx",
-    description: "Probe HTTP(S): liveness, status, title, tech, server. Target: a host or URL. The first hand to reach for on a web target.",
-    buildArgs: (t) => ["-silent", "-json", "-title", "-tech-detect", "-status-code", "-web-server", "-u", t],
-    parse: TechniqueParse.httpx,
-  },
-  {
-    name: "crawl_site",
-    engine: "katana",
-    description: "Actively crawl a live site for reachable endpoints. Target: a URL.",
-    buildArgs: (t) => ["-silent", "-json", "-u", t],
-    parse: TechniqueParse.katana,
-  },
-  {
-    name: "harvest_urls",
-    engine: "gau",
-    description: "Collect historical URLs from archives (endpoints that were linked once). Target: a domain.",
-    buildArgs: (t) => [t],
-    parse: TechniqueParse.urlList,
-  },
-  {
-    name: "discover_content",
-    engine: "ffuf",
-    description: "Brute-force unlinked content (backups, admin, .git). Target: a base URL (FUZZ is appended).",
-    buildArgs: (t) => ["-s", "-json", "-w", "/usr/share/seclists/Discovery/Web-Content/common.txt", "-u", `${t.replace(/\/$/, "")}/FUZZ`],
-    parse: TechniqueParse.ffuf,
-  },
-  {
-    name: "discover_api_spec",
-    engine: "curl",
-    description: "Fetch and parse an OpenAPI/Swagger spec into per-operation endpoints. Target: the spec URL.",
-    buildArgs: (t) => ["-s", "-L", "--max-time", "30", t],
-    parse: TechniqueParse.openapi,
-  },
-  {
-    name: "analyze_javascript",
-    engine: "curl",
-    description: "Fetch a JavaScript file and extract hidden endpoints and leaked secrets. Target: the .js URL.",
-    buildArgs: (t) => ["-s", "-L", "--max-time", "30", t],
-    parse: TechniqueParse.javascript,
-  },
-  {
-    name: "mine_parameters",
-    engine: "arjun",
-    description: "Discover hidden/unlinked request parameters on an endpoint, enriching it in the graph. Target: a URL.",
-    buildArgs: (t) => ["-u", t, "-oJ", "/dev/stdout", "-q"],
-    parse: TechniqueParse.arjun,
-  },
-]
-
 export const Input = Schema.Struct({
   target: Schema.String.annotate({ description: "The target for this technique (domain, host, URL, or spec/JS URL — see the tool description)." }),
+  wordlist: Schema.Literals(["common", "medium", "big", "raft"]).pipe(Schema.optional).annotate({
+    description: "discover_content only: content wordlist size (default 'common').",
+  }),
+  extensions: Schema.String.pipe(Schema.optional).annotate({
+    description: "discover_content only: comma-separated extensions to append, e.g. '.bak,.old,.zip,.git'.",
+  }),
+  ports: Schema.String.pipe(Schema.optional).annotate({
+    description: "scan_ports only: 'top-100' (default), 'top-1000', 'full', or a list like '80,443,8080'.",
+  }),
+  depth: Schema.Number.pipe(Schema.optional).annotate({ description: "crawl_site only: crawl depth." }),
+  severity: Schema.String.pipe(Schema.optional).annotate({
+    description: "scan_vulnerabilities only: severities to scan, e.g. 'critical,high' (default 'critical,high,medium').",
+  }),
+  tags: Schema.String.pipe(Schema.optional).annotate({
+    description: "scan_vulnerabilities only: nuclei template tags, e.g. 'cve,rce,exposure'.",
+  }),
 })
 
 export const Output = Schema.Struct({
@@ -132,7 +66,7 @@ const layer = Layer.effectDiscard(
     const location = yield* Location.Service
     const saturation = yield* KnowledgeSaturation
 
-    for (const spec of SPECS)
+    for (const spec of techniqueSpecs)
       yield* tools
         .register({
           [spec.name]: Tool.make({
@@ -153,7 +87,7 @@ const layer = Layer.effectDiscard(
                   Effect.mapError(() => new ToolFailure({ message: `Permission denied: ${spec.name}` })),
                   Effect.andThen(
                     Effect.gen(function* () {
-                      const command = ChildProcess.make(spec.engine, [...spec.buildArgs(input.target)], {
+                      const command = ChildProcess.make(spec.engine, [...spec.buildArgs(input.target, input)], {
                         cwd: location.directory,
                         stdin: "ignore",
                         detached: process.platform !== "win32",
