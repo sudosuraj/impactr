@@ -2,7 +2,7 @@ import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
 import { AttackGraph } from "@impactr-ai/core/attack-graph/graph"
 import type { NodeType, NodeStatus, EdgeRelation } from "@impactr-ai/core/attack-graph/schema"
-import { findChains, renderChains } from "./attack-chains"
+import { findChains, renderChains } from "@impactr-ai/core/attack-graph/chains"
 import { Session } from "@/session/session"
 import { engagementRoot } from "./engagement-session"
 
