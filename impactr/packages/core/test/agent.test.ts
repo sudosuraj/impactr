@@ -4,10 +4,15 @@ import { AgentV2 } from "@impactr-ai/core/agent"
 import { AppNodeBuilder } from "@impactr-ai/core/effect/app-node-builder"
 import { Location } from "@impactr-ai/core/location"
 import { AgentPlugin } from "@impactr-ai/core/plugin/agent"
+import { PentestAgent } from "@impactr-ai/core/agent/pentest"
+import { PermissionV2 } from "@impactr-ai/core/permission"
 import { AbsolutePath } from "@impactr-ai/core/schema"
 import { location } from "./fixture/location"
 import { testEffect } from "./lib/effect"
 import { agentHost, host } from "./plugin/host"
+
+/** An action name no agent's permission intent lists, to probe deny-by-default behavior. */
+const UNLISTED_ACTION = "some_action_no_agent_lists"
 
 const it = testEffect(AppNodeBuilder.build(AgentV2.node))
 
@@ -130,6 +135,39 @@ describe("AgentV2", () => {
       ])
       for (const item of agents) {
         expect(item.permissions.some((rule) => rule.action === "bash" && rule.effect !== "deny")).toBe(false)
+      }
+    }),
+  )
+
+  // Guardrail against the CLI/hosted lineages drifting apart again: this asserts the *materialized*
+  // hosted agent registry — not just its source code — actually matches the single source of truth
+  // in packages/core/src/agent/pentest.ts. packages/impactr/test/agent/agent.test.ts runs the same
+  // check against the CLI's materialized registry, so if either side ever stops consuming
+  // PentestAgent as-is, its own test fails here rather than silently drifting from the other.
+  it.effect("hosted pentest agents match the shared single source of truth", () =>
+    Effect.gen(function* () {
+      const agent = yield* AgentV2.Service
+      yield* AgentPlugin.Plugin.effect(host({ agent: agentHost(agent) })).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(location({ directory: AbsolutePath.make("/project") })),
+        ),
+      )
+
+      for (const definition of PentestAgent.all) {
+        const info = yield* agent.get(AgentV2.ID.make(definition.id))
+        expect(info).toBeDefined()
+        expect(info?.mode).toBe(definition.mode)
+
+        for (const action of definition.permission.allow)
+          expect(PermissionV2.evaluate(action, "*", info!.permissions).effect).toBe("allow")
+
+        for (const action of definition.permission.deny ?? [])
+          expect(PermissionV2.evaluate(action, "*", info!.permissions).effect).toBe("deny")
+
+        expect(PermissionV2.evaluate(UNLISTED_ACTION, "*", info!.permissions).effect).toBe(
+          definition.permission.denyByDefault ? "deny" : "allow",
+        )
       }
     }),
   )

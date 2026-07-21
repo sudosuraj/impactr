@@ -9,6 +9,7 @@ import { Auth } from "../../src/auth"
 import { Config } from "../../src/config/config"
 import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { Global } from "@impactr-ai/core/global"
+import { PentestAgent } from "@impactr-ai/core/agent/pentest"
 import { Permission } from "../../src/permission"
 import { PermissionV1 } from "@impactr-ai/core/v1/permission"
 import { Plugin } from "../../src/plugin"
@@ -23,6 +24,9 @@ const agentLayer = (flags: Partial<RuntimeFlags.Info> = {}) =>
   )
 
 const it = testEffect(agentLayer())
+
+/** An action name no agent's permission intent lists, to probe deny-by-default behavior. */
+const UNLISTED_ACTION = "some_action_no_agent_lists"
 
 // Helper to evaluate permission for a tool with wildcard pattern
 function evalPerm(agent: Agent.Info | undefined, permission: string): PermissionV1.Action | undefined {
@@ -727,4 +731,25 @@ it.instance(
       },
     },
   },
+)
+
+// Guardrail against the CLI/hosted lineages drifting apart again: this asserts the CLI's
+// *materialized* agent registry — not just its source code — actually matches the single source of
+// truth in packages/core/src/agent/pentest.ts. packages/core/test/agent.test.ts runs the same check
+// against the hosted materialized registry, so if either side ever stops consuming PentestAgent as-is,
+// its own test fails here rather than silently drifting from the other.
+it.instance("CLI pentest agents match the shared single source of truth", () =>
+  Effect.gen(function* () {
+    for (const definition of PentestAgent.all) {
+      const info = yield* load((svc) => svc.get(definition.id))
+      expect(info).toBeDefined()
+      expect(info?.mode).toBe(definition.mode)
+
+      for (const action of definition.permission.allow) expect(evalPerm(info, action)).toBe("allow")
+
+      for (const action of definition.permission.deny ?? []) expect(evalPerm(info, action)).toBe("deny")
+
+      expect(evalPerm(info, UNLISTED_ACTION)).toBe(definition.permission.denyByDefault ? "deny" : "allow")
+    }
+  }),
 )
