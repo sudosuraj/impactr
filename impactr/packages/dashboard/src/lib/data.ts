@@ -66,7 +66,10 @@ export const getEngagementDetail = query(async (id: string) => {
   const session = await requireSession()
   const engagement = await getEngagement(id, session.organizationID)
   if (!engagement) return undefined
-  const [timeline, graph] = await Promise.all([getEngagementTimeline(id), getEngagementAttackGraphSummary(id)])
+  const [timeline, graph] = await Promise.all([
+    getEngagementTimeline(id, session.organizationID),
+    getEngagementAttackGraphSummary(id, session.organizationID),
+  ])
   return { engagement, timeline, graph }
 }, "engagement-detail")
 
