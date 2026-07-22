@@ -56,6 +56,7 @@ import { SessionTable } from "@impactr-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
 import { SessionTools } from "./tools"
 import { LLMEvent } from "@impactr-ai/llm"
+import { BackgroundJob } from "@/background/job"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -140,6 +141,7 @@ const layer = Layer.effect(
     const events = yield* EventV2Bridge.Service
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
+    const background = yield* BackgroundJob.Service
     const { db } = database
     const ops = Effect.fn("SessionPrompt.ops")(function* () {
       return {
@@ -1237,6 +1239,7 @@ const layer = Layer.effect(
               Effect.provideService(ToolRegistry.Service, registry),
               Effect.provideService(MCP.Service, mcp),
               Effect.provideService(Truncate.Service, truncate),
+              Effect.provideService(BackgroundJob.Service, background),
             )
 
             if (lastUser.format?.type === "json_schema") {
@@ -1624,6 +1627,7 @@ export const node = LayerNode.make({
     EventV2Bridge.node,
     RuntimeFlags.node,
     Database.node,
+    BackgroundJob.node,
   ],
 })
 

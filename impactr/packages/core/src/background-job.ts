@@ -16,6 +16,8 @@ export type Info = {
   output?: string
   error?: string
   metadata?: Record<string, unknown>
+  /** Milliseconds since the last recorded activity (tool call or LLM token). Only set on `list`/`get`. */
+  idle_ms?: number
 }
 
 type Active = {
@@ -29,6 +31,7 @@ type Active = {
   tail: Deferred.Deferred<void>
   promoted: Deferred.Deferred<Info>
   onPromote?: Effect.Effect<void>
+  last_activity: number
 }
 
 type State = {
@@ -94,14 +97,24 @@ export interface Interface {
   readonly waitForPromotion: (id: string) => Effect.Effect<Info>
   readonly promote: (id: string) => Effect.Effect<Info | undefined>
   readonly cancel: (id: string) => Effect.Effect<Info | undefined>
+  /** Records that a job is still making progress (a tool call or LLM token), resetting its idle clock. No-op if the job isn't running. */
+  readonly touch: (id: string) => Effect.Effect<void>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@impactr/BackgroundJob") {}
 
-function snapshot(job: Active): Info {
+// A subagent runs long stretches with no external signal (a slow scan, a slow provider response),
+// so "idle" tracks time since the last recorded activity, never total runtime — a strict wall-clock
+// timeout would kill legitimately slow work. Checked on a timer well under the threshold so a job
+// is flagged only a little late, never wildly so.
+const IDLE_THRESHOLD_MS = 5 * 60_000
+const IDLE_CHECK_INTERVAL_MS = 30_000
+
+function snapshot(job: Active, now?: number): Info {
   return {
     ...job.info,
     ...(job.info.metadata ? { metadata: { ...job.info.metadata } } : {}),
+    ...(now !== undefined && job.info.status === "running" ? { idle_ms: now - job.last_activity } : {}),
   }
 }
 
@@ -188,15 +201,26 @@ export const make = Effect.gen(function* () {
   })
 
   const list: Interface["list"] = Effect.fn("BackgroundJob.list")(function* () {
+    const now = yield* Clock.currentTimeMillis
     return Array.from((yield* SynchronizedRef.get(state.jobs)).values())
-      .map(snapshot)
+      .map((job) => snapshot(job, now))
       .toSorted((a, b) => a.started_at - b.started_at)
   })
 
   const get: Interface["get"] = Effect.fn("BackgroundJob.get")(function* (id) {
     const job = (yield* SynchronizedRef.get(state.jobs)).get(id)
     if (!job) return
-    return snapshot(job)
+    const now = yield* Clock.currentTimeMillis
+    return snapshot(job, now)
+  })
+
+  const touch: Interface["touch"] = Effect.fn("BackgroundJob.touch")(function* (id) {
+    const now = yield* Clock.currentTimeMillis
+    yield* SynchronizedRef.update(state.jobs, (jobs) => {
+      const job = jobs.get(id)
+      if (!job || job.info.status !== "running") return jobs
+      return new Map(jobs).set(id, { ...job, last_activity: now })
+    })
   })
 
   const start: Interface["start"] = Effect.fn("BackgroundJob.start")(function* (input) {
@@ -233,6 +257,7 @@ export const make = Effect.gen(function* () {
               tail,
               promoted,
               onPromote: input.onPromote,
+              last_activity: started_at,
             }
             return [{ info: snapshot(job), scope, token }, new Map(jobs).set(id, job)] as readonly [
               StartResult,
@@ -257,6 +282,7 @@ export const make = Effect.gen(function* () {
     return yield* Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
         const tail = yield* Deferred.make<void>()
+        const last_activity = yield* Clock.currentTimeMillis
         const result = yield* SynchronizedRef.modify(
           state.jobs,
           (jobs): readonly [ExtendResult, Map<string, Active>] => {
@@ -269,6 +295,7 @@ export const make = Effect.gen(function* () {
                 pending: job.pending + 1,
                 next: job.next + 1,
                 tail,
+                last_activity,
               }),
             ]
           },
@@ -357,7 +384,26 @@ export const make = Effect.gen(function* () {
     return result.info
   })
 
-  return Service.of({ list, get, start, extend, wait, waitForPromotion, promote, cancel })
+  // Auto-promotes a foreground job that's gone quiet past the idle threshold, so its blocked
+  // caller (a `task` tool call awaiting the result) regains control instead of staying stuck with
+  // no way to notice or react. Already-background jobs are left alone — their idle time is only
+  // ever surfaced (via `idle_ms` on list/get), never acted on, since their caller already has control.
+  const idleWatch = Effect.gen(function* () {
+    while (true) {
+      yield* Effect.sleep(IDLE_CHECK_INTERVAL_MS)
+      const now = yield* Clock.currentTimeMillis
+      const jobs = yield* SynchronizedRef.get(state.jobs)
+      for (const job of jobs.values()) {
+        if (job.info.status !== "running") continue
+        if (job.info.metadata?.background === true) continue
+        if (now - job.last_activity < IDLE_THRESHOLD_MS) continue
+        yield* promote(job.info.id).pipe(Effect.ignore)
+      }
+    }
+  })
+  yield* idleWatch.pipe(Effect.forkIn(state.scope, { startImmediately: true }))
+
+  return Service.of({ list, get, start, extend, wait, waitForPromotion, promote, cancel, touch })
 })
 
 const layer = Layer.effect(Service, make)
