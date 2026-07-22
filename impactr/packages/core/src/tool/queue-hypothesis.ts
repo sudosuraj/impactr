@@ -11,6 +11,7 @@ import { KnowledgeGraph, node as KnowledgeGraphNode } from "../knowledge/graph"
 import { KnowledgeSaturation, node as KnowledgeSaturationNode } from "../session/saturation"
 import { EngagementReport, node as EngagementReportNode } from "../session/engagement-report"
 import { HostedContext, node as HostedContextNode } from "../session/hosted-context"
+import { HostedAttackGraph } from "../database/hosted/attack-graph"
 import { HostedHypothesisQueue } from "../database/hosted/hypothesis-queue"
 import { HostedKnowledgeGraph } from "../database/hosted/knowledge"
 import { PermissionV2 } from "../permission"
@@ -94,22 +95,49 @@ const layer = Layer.effectDiscard(
                                 .isSaturated(context.sessionID)
                                 .pipe(Effect.catch(() => Effect.succeed(false)))
                                 .pipe(
-                                  Effect.flatMap((saturated) =>
-                                    engagementReport
-                                      .generate(context.sessionID, saturated ? "saturated" : "backlog-drained")
-                                      .pipe(
-                                        Effect.catch(() => Effect.succeed(undefined)),
-                                        Effect.map((report) => {
-                                          const reportLine = report
-                                            ? ` Consolidated engagement report written to ${report.path}.`
-                                            : ""
-                                          const summary = saturated
-                                            ? `Backlog empty and knowledge saturated — the engagement is concluding.${reportLine} Do a final skim of the attack graph; if nothing new remains, you are done.`
-                                            : `Backlog empty — no queued hypotheses remain.${reportLine} If genuinely fresh surface remains (new subdomains/ports/credentials), re-scan it and queue leads; otherwise wind down.`
-                                          return { summary }
-                                        }),
-                                      ),
-                                  ),
+                                  Effect.flatMap((saturated) => {
+                                    const conclusion: EngagementReport.Conclusion = saturated
+                                      ? "saturated"
+                                      : "backlog-drained"
+                                    // A hosted engagement's graph/findings live in the per-engagement DB, not
+                                    // the local session-scoped stores EngagementReport.Service reads from —
+                                    // calling that service here would always synthesize an empty report.
+                                    // Render from the hosted data directly instead; there's no established
+                                    // hosted file-output location yet, so this is returned inline rather than
+                                    // written to a file (unlike the local path).
+                                    const reportLine = Option.isSome(hosted)
+                                      ? Effect.all([
+                                          HostedKnowledgeGraph.summarize(hosted.value.db, hosted.value.engagementID, 200),
+                                          HostedAttackGraph.getGraph(hosted.value.db, hosted.value.engagementID),
+                                        ]).pipe(
+                                          Effect.map(([findings, graphState]) =>
+                                            findings.length === 0 && Object.keys(graphState.nodes).length === 0
+                                              ? ""
+                                              : `\n\nConsolidated engagement report:\n\n${EngagementReport.render({
+                                                  sessionId: context.sessionID,
+                                                  generatedAt: new Date(),
+                                                  conclusion,
+                                                  findings,
+                                                  graph: graphState,
+                                                  plan: [],
+                                                })}`,
+                                          ),
+                                          Effect.catch(() => Effect.succeed("")),
+                                        )
+                                      : engagementReport.generate(context.sessionID, conclusion).pipe(
+                                          Effect.catch(() => Effect.succeed(undefined)),
+                                          Effect.map((report) =>
+                                            report ? ` Consolidated engagement report written to ${report.path}.` : "",
+                                          ),
+                                        )
+                                    return reportLine.pipe(
+                                      Effect.map((reportLine) => ({
+                                        summary: saturated
+                                          ? `Backlog empty and knowledge saturated — the engagement is concluding.${reportLine} Do a final skim of the attack graph; if nothing new remains, you are done.`
+                                          : `Backlog empty — no queued hypotheses remain.${reportLine} If genuinely fresh surface remains (new subdomains/ports/credentials), re-scan it and queue leads; otherwise wind down.`,
+                                      })),
+                                    )
+                                  }),
                                 )
                             // Work it inline this turn; mark done so it isn't re-pulled. New leads found go back in via "add".
                             return (
