@@ -40,19 +40,22 @@ export const ManageTaskTool = Tool.define(
         const jobByID = new Map(jobs.map((job) => [job.id, job]))
 
         const lines: string[] = []
-        // Bounded DFS guards against an unexpected cycle or runaway fan-out in the delegation tree.
-        const stack: Array<{ id: SessionID; depth: number }> = [{ id: ctx.sessionID, depth: 0 }]
+        type Frame = { id: SessionID; depth: number; label?: string }
+        // Bounded pre-order DFS guards against an unexpected cycle or runaway fan-out in the
+        // delegation tree. Each frame's line renders when it's popped, not when it's discovered —
+        // pushing children in reverse then makes the LIFO stack pop (and print) them in creation
+        // order, and keeps a multi-level tree in true pre-order instead of interleaving branches.
+        const stack: Frame[] = [{ id: ctx.sessionID, depth: 0 }]
         while (stack.length > 0 && lines.length < MAX_TREE_NODES) {
-          const { id, depth } = stack.pop()!
-          if (depth > MAX_TREE_DEPTH) continue
-          const children = yield* sessions.children(id)
-          // Push in reverse so children render in creation order despite the stack's LIFO pop.
+          const frame = stack.pop()!
+          if (frame.label !== undefined) lines.push(frame.label)
+          if (frame.depth > MAX_TREE_DEPTH) continue
+          const children = yield* sessions.children(frame.id)
           for (const child of [...children].reverse()) {
-            if (lines.length >= MAX_TREE_NODES) break
             const job = jobByID.get(child.id)
             const status = job ? ` (${job.status}${formatIdle(job.idle_ms)})` : ""
-            lines.push(`${"  ".repeat(depth)}- [${child.id}] ${child.agent ?? "unknown"}: ${child.title}${status}`)
-            stack.push({ id: child.id, depth: depth + 1 })
+            const label = `${"  ".repeat(frame.depth)}- [${child.id}] ${child.agent ?? "unknown"}: ${child.title}${status}`
+            stack.push({ id: child.id, depth: frame.depth + 1, label })
           }
         }
 

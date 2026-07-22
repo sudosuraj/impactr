@@ -1122,6 +1122,8 @@ export async function runMini(input: MiniCommandInput) {
     password: input.password,
     username: input.username,
     dir: input.directory,
+    "allow-unsafe-dir": false,
+    allowUnsafeDir: false,
     port: undefined,
     variant: undefined,
     thinking: undefined,
