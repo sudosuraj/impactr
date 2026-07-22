@@ -1,4 +1,4 @@
-import { A, createAsync } from "@solidjs/router"
+import { A, createAsync, useSubmission } from "@solidjs/router"
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { AppShell } from "~/components/layout/app-shell"
 import { Page, CountPill } from "~/components/ui/page"
@@ -6,8 +6,12 @@ import { Tabs } from "~/components/ui/tabs"
 import { StatusBadge, type EngagementStatusTone } from "~/components/ui/badge"
 import { EmptyState } from "~/components/ui/empty-state"
 import { SkeletonTable } from "~/components/ui/skeleton"
+import { Modal } from "~/components/ui/modal"
+import { Button } from "~/components/ui/button"
+import { Input } from "~/components/ui/input"
 import { IconScans } from "~/components/layout/icons"
 import { getEngagements } from "~/lib/data"
+import { createEngagement } from "~/lib/mutations"
 
 const STATUS_TONE: Record<string, EngagementStatusTone> = {
   active: "active",
@@ -28,6 +32,8 @@ function bucketOf(status: string): Bucket {
 export default function Scans() {
   const engagements = createAsync(() => getEngagements())
   const [tab, setTab] = createSignal<Bucket>("active")
+  const [newOpen, setNewOpen] = createSignal(false)
+  const submission = useSubmission(createEngagement)
 
   const grouped = createMemo(() => {
     const list = engagements() ?? []
@@ -45,7 +51,14 @@ export default function Scans() {
       <Page
         title="Scans"
         description="Engagement activity started and tracked by your Impactr team"
-        actions={<Show when={engagements()}>{(list) => <CountPill>{list().length} engagements</CountPill>}</Show>}
+        actions={
+          <div class="flex items-center gap-3">
+            <Show when={engagements()}>{(list) => <CountPill>{list().length} engagements</CountPill>}</Show>
+            <Button variant="primary" size="sm" onClick={() => setNewOpen(true)}>
+              New engagement
+            </Button>
+          </div>
+        }
       >
         <Tabs
           active={tab()}
@@ -90,6 +103,53 @@ export default function Scans() {
           </Show>
         </div>
       </Page>
+
+      <Modal open={newOpen()} onClose={() => setNewOpen(false)} title="New engagement">
+        <form
+          action={createEngagement}
+          method="post"
+          class="space-y-3"
+        >
+          <div>
+            <label class="mb-1 block text-xs font-medium text-muted-foreground" for="engagement-name">
+              Name
+            </label>
+            <Input id="engagement-name" name="name" required placeholder="Q3 external pentest" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-muted-foreground" for="engagement-target">
+              Authorized target
+            </label>
+            <Input id="engagement-target" name="target" required placeholder="acme.com" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-muted-foreground" for="engagement-scope">
+              Scope (optional, defaults to target)
+            </label>
+            <Input id="engagement-scope" name="scope" placeholder="*.acme.com" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-muted-foreground" for="engagement-exclusions">
+              Exclusions (comma-separated, optional)
+            </label>
+            <Input id="engagement-exclusions" name="exclusions" placeholder="billing.acme.com, status.acme.com" />
+          </div>
+          <Show when={submission.result?.error}>
+            <p class="text-sm text-status-danger">{submission.result?.error}</p>
+          </Show>
+          <p class="text-xs text-muted-foreground">
+            Submitting this authorizes the engagement under your organization. It does not yet start a live scan.
+          </p>
+          <div class="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setNewOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" disabled={submission.pending}>
+              {submission.pending ? "Creating…" : "Create engagement"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </AppShell>
   )
 }
