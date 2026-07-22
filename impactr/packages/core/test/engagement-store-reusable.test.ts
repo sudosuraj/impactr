@@ -76,4 +76,16 @@ describe("EngagementStore.findReusable", () => {
       })?.id,
     ).toBe("eng_1" as EngagementSchema.ID)
   })
+
+  test("a null match directory reuses regardless of the stored directory (auto-generated per-launch workspaces)", () => {
+    const list = [eng({ id: "eng_1", status: "authorized", directory: "/some/random/ulid-workspace", target: "acme.com", scope: "acme.com" })]
+    expect(EngagementStore.findReusable(list, { directory: null, target: "acme.com", scope: "acme.com" })?.id).toBe(
+      "eng_1" as EngagementSchema.ID,
+    )
+  })
+
+  test("a null match directory still requires target/scope/exclusions to match", () => {
+    const list = [eng({ id: "eng_1", status: "authorized", directory: dir, target: "acme.com", scope: "acme.com" })]
+    expect(EngagementStore.findReusable(list, { directory: null, target: "other.com", scope: "other.com" })).toBeUndefined()
+  })
 })
