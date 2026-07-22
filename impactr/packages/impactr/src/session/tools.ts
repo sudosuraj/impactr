@@ -21,6 +21,7 @@ import { EffectBridge } from "@/effect/bridge"
 import { ProviderV2 } from "@impactr-ai/core/provider"
 import { ModelV2 } from "@impactr-ai/core/model"
 import { isRecord } from "@/util/record"
+import { BackgroundJob } from "@/background/job"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -35,6 +36,7 @@ const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
   "image/png",
   "image/webp",
 ])
+const TOOL_HEARTBEAT_INTERVAL_MS = 15_000
 
 export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   agent: Agent.Info
@@ -52,6 +54,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const registry = yield* ToolRegistry.Service
   const mcp = yield* MCP.Service
   const truncate = yield* Truncate.Service
+  const background = yield* BackgroundJob.Service
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
@@ -99,12 +102,27 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         return run.promise(
           Effect.gen(function* () {
             const ctx = context(args, options)
+            yield* background.touch(ctx.sessionID).pipe(Effect.ignore)
             yield* plugin.trigger(
               "tool.execute.before",
               { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
               { args },
             )
-            const result = yield* item.execute(args, ctx)
+            // A single slow tool call (a long scan, a slow request) is still activity the whole
+            // time it runs, not just at start/end — heartbeat so it never looks idle mid-call.
+            // Scoped locally so the heartbeat fiber is interrupted the moment this call settles,
+            // rather than requiring an ambient Scope for the whole tool-resolution lifetime.
+            const result = yield* Effect.scoped(
+              Effect.gen(function* () {
+                yield* Effect.forever(
+                  Effect.sleep(TOOL_HEARTBEAT_INTERVAL_MS).pipe(
+                    Effect.andThen(background.touch(ctx.sessionID).pipe(Effect.ignore)),
+                  ),
+                ).pipe(Effect.forkScoped)
+                return yield* item.execute(args, ctx)
+              }),
+            )
+            yield* background.touch(ctx.sessionID).pipe(Effect.ignore)
             const output = {
               ...result,
               attachments: result.attachments?.map((attachment) => ({

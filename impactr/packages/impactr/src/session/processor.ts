@@ -2,7 +2,7 @@ import { LayerNode } from "@impactr-ai/core/effect/layer-node"
 import { PermissionV1 } from "@impactr-ai/core/v1/permission"
 import { Image } from "@/image/image"
 import { SessionV1 } from "@impactr-ai/core/v1/session"
-import { Cause, Deferred, Effect, Exit, Layer, Context, Scope, Schema } from "effect"
+import { Cause, Clock, Deferred, Effect, Exit, Layer, Context, Scope, Schema } from "effect"
 import * as Stream from "effect/Stream"
 import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
@@ -25,6 +25,7 @@ import { isRecord } from "@/util/record"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Database } from "@impactr-ai/core/database/database"
 import { Usage, type LLMEvent } from "@impactr-ai/llm"
+import { BackgroundJob } from "@/background/job"
 
 const DOOM_LOOP_THRESHOLD = 3
 export type Result = "compact" | "stop" | "continue"
@@ -94,6 +95,7 @@ const layer = Layer.effect(
     const image = yield* Image.Service
     const events = yield* EventV2Bridge.Service
     const database = yield* Database.Service
+    const background = yield* BackgroundJob.Service
 
     const create = Effect.fn("SessionProcessor.create")(function* (input: Input) {
       // Pre-capture snapshot before the LLM stream starts. The AI SDK
@@ -113,6 +115,17 @@ const layer = Layer.effect(
         reasoningMap: {},
       }
       let aborted = false
+      // Throttled: a stream emits many events per second, and a SynchronizedRef update on every
+      // one of them is wasted work — the idle watchdog only cares about the general vicinity of
+      // "still producing tokens", not per-event precision.
+      let lastActivityTouchAt = 0
+      const TOUCH_THROTTLE_MS = 2_000
+      const touchActivity = Effect.fn("SessionProcessor.touchActivity")(function* () {
+        const now = yield* Clock.currentTimeMillis
+        if (now - lastActivityTouchAt < TOUCH_THROTTLE_MS) return
+        lastActivityTouchAt = now
+        yield* background.touch(ctx.sessionID).pipe(Effect.ignore)
+      })
 
       const parse = (e: unknown) =>
         MessageV2.fromError(e, {
@@ -274,6 +287,7 @@ const layer = Layer.effect(
       }
 
       const handleEvent = Effect.fnUntraced(function* (value: StreamEvent) {
+        yield* touchActivity()
         switch (value.type) {
           case "reasoning-start":
             if (value.id in ctx.reasoningMap) return
@@ -710,6 +724,7 @@ export const node = LayerNode.make({
     Image.node,
     EventV2Bridge.node,
     Database.node,
+    BackgroundJob.node,
   ],
 })
 
