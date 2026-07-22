@@ -35,20 +35,38 @@ function defaultEngagementDirectory(): string {
   if (cachedDefault) return cachedDefault
   const dir = path.join(Global.Path.data, "engagements", ulid())
   fs.mkdirSync(dir, { recursive: true })
+  // A run that aborts before ever using it would otherwise leave an empty folder behind forever.
+  process.on("exit", () => {
+    try {
+      if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir)
+    } catch {}
+  })
   cachedDefault = dir
   return dir
 }
 
-// Explicit --dir (guarded against Impactr's own source) or a fresh isolated engagement workspace.
-export function resolveRunDirectory(dir: string | undefined, cwd: string, allowUnsafeDir?: boolean): string {
-  if (!dir) return defaultEngagementDirectory()
-  const resolved = path.isAbsolute(dir) ? dir : path.resolve(cwd, dir)
-  if (!allowUnsafeDir && isInsideImpactrSource(resolved)) {
-    console.error(
-      `Refusing to run against ${resolved} — it's inside Impactr's own source tree.\n` +
-        `Point --dir at an isolated engagement workspace instead, or pass --allow-unsafe-dir to override.`,
-    )
-    process.exit(1)
+function assertSafeDirectory(resolved: string, allowUnsafeDir?: boolean) {
+  if (allowUnsafeDir || !isInsideImpactrSource(resolved)) return
+  console.error(
+    `Refusing to run against ${resolved} — it's inside Impactr's own source tree.\n` +
+      `Point --dir at an isolated engagement workspace instead, or pass --allow-unsafe-dir to override.`,
+  )
+  process.exit(1)
+}
+
+// preferCwd (--continue/--session) uses the launch directory, since that's where a resumed session lives.
+export function resolveRunDirectory(
+  dir: string | undefined,
+  cwd: string,
+  options?: { allowUnsafeDir?: boolean; preferCwd?: boolean },
+): string {
+  if (!dir) {
+    if (!options?.preferCwd) return defaultEngagementDirectory()
+    const resolved = path.resolve(cwd)
+    assertSafeDirectory(resolved, options?.allowUnsafeDir)
+    return resolved
   }
+  const resolved = path.isAbsolute(dir) ? dir : path.resolve(cwd, dir)
+  assertSafeDirectory(resolved, options?.allowUnsafeDir)
   return resolved
 }
