@@ -32,6 +32,7 @@ type Active = {
   promoted: Deferred.Deferred<Info>
   onPromote?: Effect.Effect<void>
   last_activity: number
+  idle_watch: boolean
 }
 
 type State = {
@@ -71,6 +72,8 @@ export type StartInput = {
   metadata?: Record<string, unknown>
   onPromote?: Effect.Effect<void>
   run: Effect.Effect<string, unknown>
+  /** Opt-in: only jobs that ask for it are eligible for idle auto-promotion (see `touch`). */
+  idleWatch?: boolean
 }
 
 export type ExtendInput = {
@@ -258,6 +261,7 @@ export const make = Effect.gen(function* () {
               promoted,
               onPromote: input.onPromote,
               last_activity: started_at,
+              idle_watch: input.idleWatch ?? false,
             }
             return [{ info: snapshot(job), scope, token }, new Map(jobs).set(id, job)] as readonly [
               StartResult,
@@ -394,6 +398,7 @@ export const make = Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis
       const jobs = yield* SynchronizedRef.get(state.jobs)
       for (const job of jobs.values()) {
+        if (!job.idle_watch) continue
         if (job.info.status !== "running") continue
         if (job.info.metadata?.background === true) continue
         if (now - job.last_activity < IDLE_THRESHOLD_MS) continue

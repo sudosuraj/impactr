@@ -2,7 +2,7 @@ import { LayerNode } from "@impactr-ai/core/effect/layer-node"
 import { PermissionV1 } from "@impactr-ai/core/v1/permission"
 import { Image } from "@/image/image"
 import { SessionV1 } from "@impactr-ai/core/v1/session"
-import { Cause, Deferred, Effect, Exit, Layer, Context, Scope, Schema } from "effect"
+import { Cause, Clock, Deferred, Effect, Exit, Layer, Context, Scope, Schema } from "effect"
 import * as Stream from "effect/Stream"
 import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
@@ -121,7 +121,7 @@ const layer = Layer.effect(
       let lastActivityTouchAt = 0
       const TOUCH_THROTTLE_MS = 2_000
       const touchActivity = Effect.fn("SessionProcessor.touchActivity")(function* () {
-        const now = Date.now()
+        const now = yield* Clock.currentTimeMillis
         if (now - lastActivityTouchAt < TOUCH_THROTTLE_MS) return
         lastActivityTouchAt = now
         yield* background.touch(ctx.sessionID).pipe(Effect.ignore)

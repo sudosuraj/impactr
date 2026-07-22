@@ -45,9 +45,10 @@ export const ManageTaskTool = Tool.define(
         while (stack.length > 0 && lines.length < MAX_TREE_NODES) {
           const { id, depth } = stack.pop()!
           if (depth > MAX_TREE_DEPTH) continue
-          const children = yield* sessions.children(id).pipe(Effect.catch(() => Effect.succeed([])))
+          const children = yield* sessions.children(id)
           // Push in reverse so children render in creation order despite the stack's LIFO pop.
           for (const child of [...children].reverse()) {
+            if (lines.length >= MAX_TREE_NODES) break
             const job = jobByID.get(child.id)
             const status = job ? ` (${job.status}${formatIdle(job.idle_ms)})` : ""
             lines.push(`${"  ".repeat(depth)}- [${child.id}] ${child.agent ?? "unknown"}: ${child.title}${status}`)

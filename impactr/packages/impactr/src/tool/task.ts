@@ -279,6 +279,7 @@ export const TaskTool = Tool.define(
         type: id,
         title: params.description,
         metadata,
+        idleWatch: true,
         onPromote: Effect.all([
           ctx.metadata({
             title: params.description,
