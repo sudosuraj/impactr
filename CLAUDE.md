@@ -107,6 +107,24 @@ Delegation is the `task` tool (`packages/impactr/src/tool/task.ts`), not `run_ag
 
 The rest of `packages/core` (`src/session`, `src/system-context`, `src/agent`, etc.) is the general upstream-derived agent runtime — durable session history, System Context assembly, tool registry, permissions. The terminology and invariants for this layer (Context Epoch, Session Drain, Mid-Conversation System Message, the public `HttpApi`/Client/SDK contract, etc.) are precisely defined in `impactr/CONTEXT.md`; read it before touching session/context code, since the terms there are used exactly and are easy to get subtly wrong.
 
+### Which "web app" is which — do not conflate these (2026-07 finding)
+
+This monorepo has several `packages/*` that look like "the web app" at a glance. They are **not** redundant with each other; they are different products with different auth models. Check dependents before assuming any one of them is dead code or a duplicate to merge/remove:
+
+| Package | What it actually is | Auth model | Real dependents (checked by grepping actual imports, not just package.json) |
+|---|---|---|---|
+| `packages/server` | The real `HttpApi` backend — `Api`, `handlers`, `locationLayer`, `PtyEnvironment`. | Single shared username/password (`IMPACTR_SERVER_PASSWORD`) or none at all in embedded mode. **Not multi-tenant, and not supposed to be** — see below. | `packages/cli`'s `impactr serve` command runs these routes directly; `packages/impactr/src/server/*` (the CLI's own embedded local server) imports `Api`/`handlers`/`locationLayer` from it directly (not just types); `packages/sdk-next` embeds it for programmatic use. |
+| `packages/app` | The SolidJS chat/session UI that talks to `packages/server`. | Whatever `packages/server` enforces (see above). | `packages/desktop` depends on it directly for its own shell. |
+| `packages/dashboard` | The actual customer-facing, multi-tenant Impactr product: `login`/`scans`/`findings`/`reports`/`settings` routes, attack-graph visualization, a security score. | Real per-organization auth: `UserTable`/`MembershipTable`/`OrganizationTable`, session cookie carrying `{userID, organizationID}` (`src/lib/auth.ts`). Design doc: `specs/tenant-model.md`. | Has its own direct DB connection (`src/lib/db.ts`, Drizzle against the same hosted tables `packages/core`'s hosted tool lineage writes) — does **not** call `packages/server`'s `HttpApi` at all. |
+| `packages/console` | A separate SST app (`mail`/`function`/`resource`/`support`) — looks like internal ops/billing tooling, not customer-facing. | Its own, unrelated to the above. | Not audited yet. |
+| `packages/enterprise` | A SolidStart scaffold with no customized routes yet (still the default template README) — likely unstarted. | N/A | None found. |
+
+**Why `packages/server` being single-tenant is correct, not a gap:** it's a remote-control view of *your own* running CLI session (`impactr serve`, the embedded browser view, the desktop app) — conceptually a local dev tool, not a hosted product. Multi-tenancy doesn't apply to "watch your own terminal session in a browser." Do not try to add organization/multi-tenant auth here or delete it in favor of `dashboard`; they solve different problems and multiple real commands/packages depend on it as-is.
+
+**`packages/dashboard`'s tenant-scoping rule (see `packages/dashboard/src/lib/queries.ts`'s own header comment and `specs/tenant-model.md`):** every dashboard query must join through `engagement.organization_id` — never trust a bare `finding`/`asset`/`engagement` id without it. Found and fixed one violation of this on the first audit: `getEngagementTimeline`/`getEngagementAttackGraphSummary` took a bare `engagementId` with no organization join. It wasn't actively exploitable (their one caller checked ownership first via `getEngagement(id, organizationID)`), but it was a landmine — any new caller that skipped that upstream check would leak one org's attack-graph/findings/audit-log data to another. When adding a new `dashboard` query function, it must take and enforce `organizationID` itself; don't rely on the caller to have already checked.
+
+**`packages/core` lib gotcha:** unlike `packages/impactr`, `packages/core`'s tsconfig doesn't declare DOM types like `RequestInfo`, but its `typeof fetch` binding does still require `preconnect` (structurally, from a newer `lib.dom.d.ts`). When writing a custom-fetch shim in `packages/core` (as `tool/webfetch.ts` does for `sslVerify`/`proxy` support), type parameters off `Parameters<typeof fetch>` instead of the bare `RequestInfo` name, and cast the result `as typeof fetch` rather than trying to satisfy `preconnect` structurally.
+
 ## Conventions (full detail in `impactr/AGENTS.md`)
 
 - Branch names: at most three hyphen-separated words, no slashes or `type/` prefixes (e.g. `session-recovery`, not `feat/session-recovery`).
