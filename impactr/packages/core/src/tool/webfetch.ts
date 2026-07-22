@@ -76,6 +76,12 @@ const headers = (format: Format, userAgent: string) => ({
   "Accept-Language": "en-US,en;q=0.9",
 })
 
+/** Drop any entry whose key case-insensitively matches `name`, so a re-set of it can't collide. */
+const withoutHeader = (source: Record<string, string>, name: string): Record<string, string> => {
+  const lower = name.toLowerCase()
+  return Object.fromEntries(Object.entries(source).filter(([key]) => key.toLowerCase() !== lower))
+}
+
 const browserUserAgent =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 
@@ -192,9 +198,16 @@ const layer = Layer.effectDiscard(
               const { body, contentType } = yield* Effect.gen(function* () {
                 const response = yield* execute(http, input.url, method, requestHeaders, input.body).pipe(
                   // Retry with an honest UA if blocked by Cloudflare bot detection (TLS fingerprint
-                  // mismatch); forced last so it always wins over a caller-supplied User-Agent header.
+                  // mismatch); the caller's User-Agent (in any casing) is stripped first so this
+                  // always wins rather than depending on object-spread key-collision behavior.
                   Effect.catchIf(isCloudflareChallenge, () =>
-                    execute(http, input.url, method, { ...requestHeaders, "User-Agent": "impactr" }, input.body),
+                    execute(
+                      http,
+                      input.url,
+                      method,
+                      { ...withoutHeader(requestHeaders, "User-Agent"), "User-Agent": "impactr" },
+                      input.body,
+                    ),
                   ),
                 )
                 const contentType = response.headers["content-type"] || ""
