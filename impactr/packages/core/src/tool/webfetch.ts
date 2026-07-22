@@ -111,9 +111,14 @@ const execute = (
   body?: string,
 ) => http.execute(request(url, method, requestHeaders, body)).pipe(Effect.flatMap(HttpClientResponse.filterStatusOk))
 
-/** Route through a target proxy (Burp/ZAP) and/or bypass TLS verification for self-signed target certs. */
+/**
+ * Route through a target proxy (Burp/ZAP) and/or bypass TLS verification for self-signed target
+ * certs. Typed off `Parameters<typeof fetch>` (not the DOM `RequestInfo` name, which this package's
+ * lib config doesn't declare) and cast to `typeof fetch` since FetchHttpClient.Fetch's type includes
+ * static members (e.g. `preconnect`) this closure never needs to actually implement.
+ */
 const customFetch = (sslVerify: boolean | undefined, proxy: string | undefined) =>
-  (input: RequestInfo | URL, init?: RequestInit) => {
+  ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const finalInit = { ...init } as any
     if (sslVerify === false) {
       finalInit.tls = { rejectUnauthorized: false }
@@ -121,7 +126,7 @@ const customFetch = (sslVerify: boolean | undefined, proxy: string | undefined) 
     }
     if (proxy) finalInit.proxy = proxy
     return fetch(input, finalInit)
-  }
+  }) as typeof fetch
 
 const collectBody = (response: HttpClientResponse.HttpClientResponse) =>
   collectBoundedResponseBody(
