@@ -26,6 +26,7 @@ import { Filesystem } from "@/util/filesystem"
 import { createImpactrClient, type ImpactrClient, type ToolPart } from "@impactr-ai/sdk/v2"
 import { FormatError, FormatUnknownError } from "../error"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
+import { RunDirectory } from "../run-directory"
 
 type ModelInput = Parameters<ImpactrClient["session"]["prompt"]>[0]["model"]
 
@@ -130,9 +131,10 @@ export const RunCommand = effectCmd({
   // --attach connects to a remote server (no local instance needed); the
   // default path runs an in-process server and needs the project instance.
   instance: (args) => !args.attach,
-  // For --dir without --attach, load instance for the resolved target dir.
+  // Without --dir this is a fresh isolated engagement workspace, never the launch-time cwd.
   // The handler also chdirs (preserving the legacy order: chdir → file resolution).
-  directory: (args) => (args.dir && !args.attach ? path.resolve(process.cwd(), args.dir) : process.cwd()),
+  directory: (args) =>
+    args.attach ? process.cwd() : RunDirectory.resolveRunDirectory(args.dir, process.cwd(), args["allow-unsafe-dir"]),
   builder: (yargs: Argv) =>
     yargs
       .positional("message", {
@@ -222,6 +224,11 @@ export const RunCommand = effectCmd({
       .option("dir", {
         type: "string",
         describe: "directory to run in, path on remote server if attaching",
+      })
+      .option("allow-unsafe-dir", {
+        type: "boolean",
+        default: false,
+        describe: "allow --dir to point inside Impactr's own source tree (blocked by default)",
       })
       .option("port", {
         type: "number",
@@ -370,14 +377,16 @@ export const RunCommand = effectCmd({
 
       const root = Filesystem.resolve(process.env.PWD ?? process.cwd())
       const directory = (() => {
-        if (!args.dir) return args.attach ? undefined : root
         if (args.attach) return args.dir
 
+        // Memoized, so this agrees with the earlier `directory:` cmd option's resolution.
+        const target = RunDirectory.resolveRunDirectory(args.dir, root, args["allow-unsafe-dir"])
+        if (!args.dir) UI.println(UI.Style.TEXT_DIM, `engagement workspace: ${target}`, UI.Style.TEXT_NORMAL)
         try {
-          process.chdir(path.isAbsolute(args.dir) ? args.dir : path.join(root, args.dir))
+          process.chdir(target)
           return process.cwd()
         } catch {
-          UI.error("Failed to change directory to " + args.dir)
+          UI.error("Failed to change directory to " + target)
           process.exit(1)
         }
       })()
