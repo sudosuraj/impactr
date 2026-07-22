@@ -40,8 +40,17 @@ function defaultEngagementDirectory(): string {
 }
 
 // Explicit --dir (guarded against Impactr's own source) or a fresh isolated engagement workspace.
-export function resolveRunDirectory(dir: string | undefined, cwd: string, allowUnsafeDir?: boolean): string {
-  if (!dir) return defaultEngagementDirectory()
+// `resuming` is true for `--continue`/`--session` with no explicit --dir: session lookup is scoped
+// to the launch directory's project, so minting a fresh (empty) engagement directory here would make
+// resumption silently fail to find the session and fall through to creating a new one instead. In
+// that case, fall back to the launch cwd — the pre-workspace-isolation behavior — rather than isolating.
+export function resolveRunDirectory(
+  dir: string | undefined,
+  cwd: string,
+  allowUnsafeDir?: boolean,
+  resuming?: boolean,
+): string {
+  if (!dir) return resuming ? cwd : defaultEngagementDirectory()
   const resolved = path.isAbsolute(dir) ? dir : path.resolve(cwd, dir)
   if (!allowUnsafeDir && isInsideImpactrSource(resolved)) {
     console.error(
