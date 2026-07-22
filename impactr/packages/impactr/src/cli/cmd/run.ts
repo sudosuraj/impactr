@@ -125,6 +125,11 @@ async function toolError(part: ToolPart) {
   }
 }
 
+// Shared by the `directory:` cmd option and the handler so both resolve --dir against the same base.
+function resolveLaunchRoot() {
+  return Filesystem.resolve(process.env.PWD ?? process.cwd())
+}
+
 export const RunCommand = effectCmd({
   command: "run [message..]",
   describe: "run impactr with a message",
@@ -132,18 +137,15 @@ export const RunCommand = effectCmd({
   // default path runs an in-process server and needs the project instance.
   instance: (args) => !args.attach,
   // Without --dir this is a fresh isolated engagement workspace, never the launch-time cwd —
-  // except when resuming (--continue/--session), where session lookup is scoped to the launch
-  // directory's project, so we must stay on the launch cwd instead of isolating into a fresh one.
+  // except when resuming (--continue/--session), which must target wherever that session lives.
   // The handler also chdirs (preserving the legacy order: chdir → file resolution).
   directory: (args) =>
     args.attach
       ? process.cwd()
-      : RunDirectory.resolveRunDirectory(
-          args.dir,
-          process.cwd(),
-          args["allow-unsafe-dir"],
-          Boolean(args.continue || args.session),
-        ),
+      : RunDirectory.resolveRunDirectory(args.dir, resolveLaunchRoot(), {
+          allowUnsafeDir: args["allow-unsafe-dir"],
+          preferCwd: Boolean(args.continue || args.session),
+        }),
   builder: (yargs: Argv) =>
     yargs
       .positional("message", {
@@ -384,18 +386,17 @@ export const RunCommand = effectCmd({
 
       const replay = args.replay === false ? false : args.replay || args["replay-limit"] !== undefined
 
-      const root = Filesystem.resolve(process.env.PWD ?? process.cwd())
+      const root = resolveLaunchRoot()
       const directory = (() => {
         if (args.attach) return args.dir
 
-        // Memoized, so this agrees with the earlier `directory:` cmd option's resolution.
-        const target = RunDirectory.resolveRunDirectory(
-          args.dir,
-          root,
-          args["allow-unsafe-dir"],
-          Boolean(args.continue || args.session),
-        )
-        if (!args.dir) UI.println(UI.Style.TEXT_DIM, `engagement workspace: ${target}`, UI.Style.TEXT_NORMAL)
+        // Same base and flags as the earlier `directory:` cmd option, so they always agree.
+        const target = RunDirectory.resolveRunDirectory(args.dir, root, {
+          allowUnsafeDir: args["allow-unsafe-dir"],
+          preferCwd: Boolean(args.continue || args.session),
+        })
+        if (!args.dir && !args.continue && !args.session)
+          UI.println(UI.Style.TEXT_DIM, `engagement workspace: ${target}`, UI.Style.TEXT_NORMAL)
         try {
           process.chdir(target)
           return process.cwd()
