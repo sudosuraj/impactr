@@ -77,7 +77,7 @@ const layer = Layer.effectDiscard(
             execute: (input, context) =>
               permission
                 .assert({
-                  action: "technique",
+                  action: spec.name,
                   resources: ["*"],
                   sessionID: context.sessionID,
                   agent: context.agent,
