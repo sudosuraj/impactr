@@ -114,3 +114,17 @@ export const complete = (db: HostedDatabase.DatabaseShape, id: string, outcome: 
     .set({ status: outcome })
     .where(eq(HostedHypothesisQueueTable.id, id))
     .pipe(Effect.orDie, Effect.asVoid)
+
+/**
+ * Engagement-scoped counterpart of session/hypothesis-queue.ts's reclaimStale: returns hypotheses
+ * left "processing" by an interrupted drain to "pending" so they are re-explored. Not yet called
+ * anywhere — the local queue's version is invoked from SessionRunner.run's recovery path
+ * (session/runner/llm.ts), which would need to resolve HostedContext to call this too; that wiring
+ * is intentionally left for a separate change rather than touched here.
+ */
+export const reclaimStale = (db: HostedDatabase.DatabaseShape, engagementId: EngagementSchema.ID): Effect.Effect<void> =>
+  db
+    .update(HostedHypothesisQueueTable)
+    .set({ status: "pending" })
+    .where(and(eq(HostedHypothesisQueueTable.engagement_id, engagementId), eq(HostedHypothesisQueueTable.status, "processing")))
+    .pipe(Effect.orDie, Effect.asVoid)
