@@ -7,6 +7,7 @@ import { ToolRegistry } from "./registry"
 import { Tool } from "./tool"
 import { Tools } from "./tools"
 import { AttackGraph, node as AttackGraphNode, NodeType, NodeStatus, EdgeRelation } from "../attack-graph/graph"
+import { findChains, renderChains } from "../attack-graph/chains"
 import { HostedContext, node as HostedContextNode } from "../session/hosted-context"
 import { HostedAttackGraph } from "../database/hosted/attack-graph"
 import { PermissionV2 } from "../permission"
@@ -20,11 +21,14 @@ const LOOP_THRESHOLD = 3
 const NEIGHBOR_LIMIT = 25
 
 export const description =
-  "Interact with the global Attack Graph. Add nodes (targets, findings), add edges (relationships), update node status, or query the graph to understand your current pentesting state."
+  "Interact with the global Attack Graph. Add nodes (targets, findings), add edges (relationships), update node status, query the graph to understand your current pentesting state, or surface exploit chains — composed paths like subdomain --exposes--> endpoint --vulnerable_to--> RCE, ranked by severity."
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["add_node", "add_edge", "update_status", "query", "get_node"]).annotate({
+  action: Schema.Literals(["add_node", "add_edge", "update_status", "query", "get_node", "chains"]).annotate({
     description: "The action to perform.",
+  }),
+  limit: Schema.Number.pipe(Schema.optional).annotate({
+    description: "For 'chains': max number of chains to return (default 15).",
   }),
   nodeId: Schema.String.pipe(Schema.optional).annotate({
     description: "Unique identifier for the node (e.g. 'ip:192.168.1.1', 'port:80', 'endpoint:/api/login').",
@@ -209,6 +213,12 @@ const layer = Layer.effectDiscard(
                           "Active",
                           active,
                         )}${stuckSection}\n\n(Use get_node <id> for a node's full detail and neighbors.)`
+                        break
+                      }
+                      case "chains": {
+                        const graphState = yield* getGraph()
+                        const chains = findChains(graphState, input.limit ?? 15)
+                        summary = renderChains(chains)
                         break
                       }
                     }

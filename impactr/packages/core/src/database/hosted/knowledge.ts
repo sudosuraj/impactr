@@ -1,9 +1,9 @@
 export * as HostedKnowledgeGraph from "./knowledge"
 
 import { Effect } from "effect"
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import type { EngagementSchema } from "../../engagement/schema"
-import type { FindingRecord } from "../../knowledge/graph"
+import type { Finding, FindingRecord } from "../../knowledge/graph"
 import type { SessionSchema } from "../../session/schema"
 import type { HostedDatabase } from "../hosted-database"
 import { HostedGraphNodeTable } from "./pentest-sql"
@@ -87,6 +87,33 @@ export const addFinding = (
       status: "created" as const,
       potential: finding.noveltyScore * finding.impactScore * finding.confidenceScore,
     }
+  })
+
+/** Engagement-scoped counterpart of knowledge/graph.ts's summarize, for the wind-down report. */
+export const summarize = (
+  db: HostedDatabase.DatabaseShape,
+  engagementId: EngagementSchema.ID,
+  limit: number,
+): Effect.Effect<ReadonlyArray<Finding>> =>
+  Effect.gen(function* () {
+    const nodes = yield* db
+      .select()
+      .from(HostedGraphNodeTable)
+      .where(eq(HostedGraphNodeTable.engagement_id, engagementId))
+      .orderBy(
+        sql`${HostedGraphNodeTable.novelty_score} * ${HostedGraphNodeTable.impact_score} * ${HostedGraphNodeTable.confidence_score} desc`,
+      )
+      .limit(limit)
+      .pipe(Effect.orDie)
+    return nodes.map((n) => ({
+      id: n.id,
+      type: n.type,
+      data: n.data,
+      noveltyScore: n.novelty_score,
+      confidenceScore: n.confidence_score,
+      impactScore: n.impact_score,
+      potential: n.novelty_score * n.impact_score * n.confidence_score,
+    }))
   })
 
 export const getPotentialScore = (db: HostedDatabase.DatabaseShape, findingId: string) =>

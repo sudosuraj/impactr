@@ -110,16 +110,28 @@ export async function getAttackGraphSummary(organizationID: string) {
   return { totalNodes: nodes.length, totalEdges: edges.length, byStatus }
 }
 
-export async function getEngagementAttackGraphSummary(engagementId: string) {
+export async function getEngagementAttackGraphSummary(engagementId: string, organizationID: string) {
   const nodes = await db
     .select({ status: HostedAttackGraphNodeTable.status })
     .from(HostedAttackGraphNodeTable)
-    .where(eq(HostedAttackGraphNodeTable.engagement_id, engagementId as any))
+    .innerJoin(EngagementTable, eq(HostedAttackGraphNodeTable.engagement_id, EngagementTable.id))
+    .where(
+      and(
+        eq(HostedAttackGraphNodeTable.engagement_id, engagementId as any),
+        eq(EngagementTable.organization_id, organizationID as any),
+      ),
+    )
 
   const edges = await db
     .select({ id: HostedAttackGraphEdgeTable.source })
     .from(HostedAttackGraphEdgeTable)
-    .where(eq(HostedAttackGraphEdgeTable.engagement_id, engagementId as any))
+    .innerJoin(EngagementTable, eq(HostedAttackGraphEdgeTable.engagement_id, EngagementTable.id))
+    .where(
+      and(
+        eq(HostedAttackGraphEdgeTable.engagement_id, engagementId as any),
+        eq(EngagementTable.organization_id, organizationID as any),
+      ),
+    )
 
   const byStatus: Record<string, number> = {}
   for (const node of nodes) byStatus[node.status] = (byStatus[node.status] ?? 0) + 1
@@ -200,11 +212,41 @@ export function getEngagement(id: string, organizationID: string) {
 }
 
 /** Chronological, real events for an engagement: assets discovered, findings recorded, audit log entries. */
-export async function getEngagementTimeline(engagementId: string) {
+export async function getEngagementTimeline(engagementId: string, organizationID: string) {
   const [assets, findings, auditLog] = await Promise.all([
-    db.select().from(AsmAssetTable).where(eq(AsmAssetTable.engagement_id, engagementId as any)),
-    db.select().from(FindingTable).where(eq(FindingTable.engagement_id, engagementId as any)),
-    db.select().from(EngagementAuditLogTable).where(eq(EngagementAuditLogTable.engagement_id, engagementId as any)),
+    db
+      .select({ asset: AsmAssetTable })
+      .from(AsmAssetTable)
+      .innerJoin(EngagementTable, eq(AsmAssetTable.engagement_id, EngagementTable.id))
+      .where(
+        and(
+          eq(AsmAssetTable.engagement_id, engagementId as any),
+          eq(EngagementTable.organization_id, organizationID as any),
+        ),
+      )
+      .then((rows) => rows.map((row) => row.asset)),
+    db
+      .select({ finding: FindingTable })
+      .from(FindingTable)
+      .innerJoin(EngagementTable, eq(FindingTable.engagement_id, EngagementTable.id))
+      .where(
+        and(
+          eq(FindingTable.engagement_id, engagementId as any),
+          eq(EngagementTable.organization_id, organizationID as any),
+        ),
+      )
+      .then((rows) => rows.map((row) => row.finding)),
+    db
+      .select({ log: EngagementAuditLogTable })
+      .from(EngagementAuditLogTable)
+      .innerJoin(EngagementTable, eq(EngagementAuditLogTable.engagement_id, EngagementTable.id))
+      .where(
+        and(
+          eq(EngagementAuditLogTable.engagement_id, engagementId as any),
+          eq(EngagementTable.organization_id, organizationID as any),
+        ),
+      )
+      .then((rows) => rows.map((row) => row.log)),
   ])
 
   type Event = { id: string; time: number; kind: "asset" | "finding" | "audit"; data: unknown }

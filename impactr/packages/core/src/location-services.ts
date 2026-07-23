@@ -24,6 +24,7 @@ import { Pty } from "./pty"
 import { QuestionV2 } from "./question"
 import { Reference } from "./reference"
 import { ReferenceGuidance } from "./reference/guidance"
+import { SessionExecution } from "./session/execution"
 import * as SessionRunnerLLM from "./session/runner/llm"
 import { SessionRunnerModel } from "./session/runner/model"
 import { SessionTodo } from "./session/todo"
@@ -90,7 +91,15 @@ export function buildLocationServiceMap(
     LocationServiceMap.Service,
     LayerMap.make(
       (ref: Location.Ref) => {
-        const allReplacements = replacements.concat([[Location.node, Location.boundNode(ref)]])
+        // SessionExecution's real implementation depends on LocationServiceMap.Service itself
+        // (circular from in here), so this per-location graph gets the noop by default; callers
+        // that own the full session-execution wiring (e.g. SessionV2's own node graph) bind the
+        // real implementation independently, outside this function.
+        const allReplacements: LayerNode.Replacements = [
+          [SessionExecution.node, SessionExecution.noopLayer],
+          ...replacements,
+          [Location.node, Location.boundNode(ref)],
+        ]
         const location = LayerNode.hoist(locationServices, Node.tags.values.global, allReplacements)
 
         return LayerNode.compile(location.node).pipe(

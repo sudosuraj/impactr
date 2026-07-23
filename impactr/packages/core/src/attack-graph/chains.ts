@@ -1,4 +1,4 @@
-import type { GraphState, Node } from "@impactr-ai/core/attack-graph/schema"
+import type { GraphState, Node } from "./schema"
 
 /**
  * Pure exploit-chain surfacing over the Attack Graph. A chain is a composed path — small gaps that

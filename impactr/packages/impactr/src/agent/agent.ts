@@ -11,13 +11,9 @@ import { ProviderTransform } from "@/provider/transform"
 
 import PROMPT_GENERATE from "./generate.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
-import PROMPT_ENUMERATE from "./prompt/enumerate.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
-import PROMPT_ORCHESTRATOR from "./prompt/orchestrator.txt"
-import PROMPT_RECON from "./prompt/recon.txt"
-import PROMPT_EXPLOIT from "./prompt/exploit.txt"
-import PROMPT_REPORT from "./prompt/report.txt"
+import { PentestAgent } from "@impactr-ai/core/agent/pentest"
 import { Permission } from "@/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@impactr-ai/core/global"
@@ -141,140 +137,65 @@ const layer = Layer.effect(
 
         const user = Permission.fromConfig(cfg.permission ?? {})
 
+        // Converts a PentestAgent.PermissionIntent (shared with the hosted V2 lineage) into this
+        // engine's V1 config-object Ruleset shape — the only place the two frameworks' rule shapes
+        // still legitimately differ; the intent content itself is never hand-duplicated.
+        const configFromIntent = (intent: PentestAgent.PermissionIntent) => ({
+          ...(intent.denyByDefault ? { "*": "deny" as const } : {}),
+          ...Object.fromEntries(intent.allow.map((action) => [action, "allow" as const])),
+          ...Object.fromEntries((intent.deny ?? []).map((action) => [action, "deny" as const])),
+          ...(intent.readonlyExternalDirectory ? { external_directory: readonlyExternalDirectory } : {}),
+        })
+
         const agents: Record<string, Info> = {
           attack: {
-            name: "attack",
-            description: "Full engagement orchestrator. Plans strategy, owns the attack graph and scope, and delegates ALL execution to subagents. Runs no scanning or exploitation tools itself.",
-            prompt: PROMPT_ORCHESTRATOR,
+            name: PentestAgent.ORCHESTRATOR.id,
+            description: PentestAgent.ORCHESTRATOR.description,
+            prompt: PentestAgent.ORCHESTRATOR.prompt,
             options: {},
             // The orchestrator MANAGES and DELEGATES — deny-by-default, then allow only the
             // strategy/scope/graph/delegation tools. No shell, no technique scanners, no webfetch,
             // no edit: every concrete action against the target is delegated to a subagent. This is
             // a hard capability boundary, not just a prompt instruction.
-            permission: Permission.merge(
-              defaults,
-              Permission.fromConfig({
-                "*": "deny",
-                question: "deny",
-                task: "allow",
-                set_scope: "allow",
-                get_scope: "allow",
-                attack_graph: "allow",
-                attack_plan: "allow",
-                record_discovery: "allow",
-                queue_hypothesis: "allow",
-                manage_task: "allow",
-                todowrite: "allow",
-                read: "allow",
-                websearch: "allow",
-                ask_permission: "allow",
-                external_directory: "allow",
-              }),
-              user,
-            ),
-            mode: "primary",
+            permission: Permission.merge(defaults, Permission.fromConfig(configFromIntent(PentestAgent.ORCHESTRATOR.permission)), user),
+            mode: PentestAgent.ORCHESTRATOR.mode,
             native: true,
             steps: 10000,
           },
           recon: {
-            name: "recon",
-            description: "Reconnaissance only. Maps attack surface, identifies technologies. Does not exploit.",
-            prompt: PROMPT_RECON,
+            name: PentestAgent.RECON.id,
+            description: PentestAgent.RECON.description,
+            prompt: PentestAgent.RECON.prompt,
             options: {},
-            permission: Permission.merge(
-              defaults,
-              Permission.fromConfig({
-                question: "allow",
-                shell: "allow",
-                webfetch: "allow",
-                read: "allow",
-                external_directory: "allow",
-                edit: "deny"
-              }),
-              user,
-            ),
-            mode: "primary",
+            permission: Permission.merge(defaults, Permission.fromConfig(configFromIntent(PentestAgent.RECON.permission)), user),
+            mode: PentestAgent.RECON.mode,
             native: true,
           },
           enumerate: {
-            name: "enumerate",
-            permission: Permission.merge(
-              defaults,
-              Permission.fromConfig({
-                "*": "deny",
-                grep: "allow",
-                glob: "allow",
-                list: "allow",
-                shell: "allow",
-                webfetch: "allow",
-                read: "allow",
-                // Recursive delegation: enumerate can fan out its own child subagents (e.g. one per
-                // host/wordlist) and hand a proven lead to `exploit` — parallelism, not serial grind.
-                task: "allow",
-                manage_task: "allow",
-                get_scope: "allow",
-                // Structured enumeration: the technique tools and the shared graph/knowledge stores.
-                attack_graph: "allow",
-                record_discovery: "allow",
-                queue_hypothesis: "allow",
-                enumerate_subdomains: "allow",
-                resolve_dns: "allow",
-                scan_ports: "allow",
-                probe_http: "allow",
-                crawl_site: "allow",
-                harvest_urls: "allow",
-                discover_content: "allow",
-                scan_vulnerabilities: "allow",
-                discover_api_spec: "allow",
-                analyze_javascript: "allow",
-                mine_parameters: "allow",
-                external_directory: readonlyExternalDirectory,
-              }),
-              user,
-            ),
-            description: `Use strictly for active enumeration: directory brute-force, parameter fuzzing, and mapping attack surface. Do NOT use for reporting.`,
-            prompt: PROMPT_ENUMERATE,
+            name: PentestAgent.ENUMERATE.id,
+            description: PentestAgent.ENUMERATE.description,
+            prompt: PentestAgent.ENUMERATE.prompt,
+            permission: Permission.merge(defaults, Permission.fromConfig(configFromIntent(PentestAgent.ENUMERATE.permission)), user),
             options: {},
-            mode: "subagent",
+            mode: PentestAgent.ENUMERATE.mode,
             native: true,
           },
           exploit: {
-            name: "exploit",
-            description: `Use strictly for deep-dive exploitation of a specific discovered vulnerability. Spawned by attack. Do NOT use for reporting.`,
-            prompt: PROMPT_EXPLOIT,
-            permission: Permission.merge(
-              defaults,
-              Permission.fromConfig({
-                shell: "allow",
-                webfetch: "allow",
-                edit: "allow",
-                read: "allow",
-                external_directory: "allow"
-              }),
-              user,
-            ),
+            name: PentestAgent.EXPLOIT.id,
+            description: PentestAgent.EXPLOIT.description,
+            prompt: PentestAgent.EXPLOIT.prompt,
+            permission: Permission.merge(defaults, Permission.fromConfig(configFromIntent(PentestAgent.EXPLOIT.permission)), user),
             options: {},
-            mode: "subagent",
+            mode: PentestAgent.EXPLOIT.mode,
             native: true,
           },
           report: {
-            name: "report",
-            description: `Use strictly for producing the final structured vulnerability pentest report from session findings. Do NOT use for active scanning or exploitation.`,
-            prompt: PROMPT_REPORT,
-            permission: Permission.merge(
-              defaults,
-              Permission.fromConfig({
-                "*": "deny",
-                edit: "allow",
-                read: "allow",
-                // The report writer reads confirmed findings from the shared attack graph.
-                attack_graph: "allow",
-                external_directory: "allow"
-              }),
-              user,
-            ),
+            name: PentestAgent.REPORT.id,
+            description: PentestAgent.REPORT.description,
+            prompt: PentestAgent.REPORT.prompt,
+            permission: Permission.merge(defaults, Permission.fromConfig(configFromIntent(PentestAgent.REPORT.permission)), user),
             options: {},
-            mode: "subagent",
+            mode: PentestAgent.REPORT.mode,
             native: true,
           },
           compaction: {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { findChains, renderChains } from "../src/tool/attack-chains"
-import type { GraphState, Node } from "@impactr-ai/core/attack-graph/schema"
+import { findChains, renderChains } from "../src/attack-graph/chains"
+import type { GraphState, Node } from "../src/attack-graph/schema"
 
 const node = (over: { id: string; type: Node["type"]; label: string; status?: Node["status"]; severity?: string }): Node => ({
   id: over.id,

@@ -2,7 +2,7 @@ export * as WebFetchTool from "./webfetch"
 
 import { ToolFailure } from "@impactr-ai/llm"
 import { Duration, Effect, Layer, Schema } from "effect"
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
+import { FetchHttpClient, HttpBody, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { Parser } from "htmlparser2"
 import TurndownService from "turndown"
 import { makeLocationNode } from "../effect/app-node"
@@ -27,11 +27,25 @@ const Timeout = Schema.Number.check(Schema.isGreaterThan(0), Schema.isLessThanOr
 
 export const Input = Schema.Struct({
   url: Schema.String.annotate({ description: "The HTTP or HTTPS URL to fetch content from" }),
+  method: Schema.String.pipe(Schema.optional).annotate({
+    description: "HTTP method (GET, POST, PUT, DELETE, etc.). Defaults to GET.",
+  }),
+  headers: Schema.Record(Schema.String, Schema.String).pipe(Schema.optional).annotate({
+    description: "Custom HTTP headers",
+  }),
+  body: Schema.String.pipe(Schema.optional).annotate({ description: "Request body for POST/PUT/etc." }),
   format: Schema.Literals(["text", "markdown", "html"])
     .annotate({ description: "The format to return the content in. Defaults to markdown." })
     .pipe(Schema.withDecodingDefault(Effect.succeed("markdown" as const))),
   timeout: Timeout.pipe(Schema.optional).annotate({
     description: `Optional timeout in seconds (maximum: ${MAX_TIMEOUT_SECONDS})`,
+  }),
+  sslVerify: Schema.Boolean.pipe(Schema.optional).annotate({
+    description:
+      "Whether to verify SSL certificates. Defaults to true. Set to false to bypass for self-signed certificates on target systems.",
+  }),
+  proxy: Schema.String.pipe(Schema.optional).annotate({
+    description: "Optional proxy URL to route traffic through (e.g. http://127.0.0.1:8080 for Burp Suite or OWASP ZAP).",
   }),
 })
 
@@ -62,6 +76,12 @@ const headers = (format: Format, userAgent: string) => ({
   "Accept-Language": "en-US,en;q=0.9",
 })
 
+/** Drop any entry whose key case-insensitively matches `name`, so a re-set of it can't collide. */
+const withoutHeader = (source: Record<string, string>, name: string): Record<string, string> => {
+  const lower = name.toLowerCase()
+  return Object.fromEntries(Object.entries(source).filter(([key]) => key.toLowerCase() !== lower))
+}
+
 const browserUserAgent =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 
@@ -80,15 +100,39 @@ const isCloudflareChallenge = (error: unknown) => {
   return response.status === 403 && response.headers["cf-mitigated"] === "challenge"
 }
 
-const request = (url: string, format: Format, userAgent = browserUserAgent) =>
-  HttpClientRequest.get(url).pipe(HttpClientRequest.setHeaders(headers(format, userAgent)))
+const request = (url: string, method: string, requestHeaders: Record<string, string>, body?: string) => {
+  const req = HttpClientRequest.make(method as any)(url).pipe(HttpClientRequest.setHeaders(requestHeaders))
+  return body ? req.pipe(HttpClientRequest.setBody(HttpBody.text(body))) : req
+}
 
 const assertHttpUrl = (url: URL) => {
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("URL must use http:// or https://")
 }
 
-const execute = (http: HttpClient.HttpClient, url: string, format: Format, userAgent = browserUserAgent) =>
-  http.execute(request(url, format, userAgent)).pipe(Effect.flatMap(HttpClientResponse.filterStatusOk))
+const execute = (
+  http: HttpClient.HttpClient,
+  url: string,
+  method: string,
+  requestHeaders: Record<string, string>,
+  body?: string,
+) => http.execute(request(url, method, requestHeaders, body)).pipe(Effect.flatMap(HttpClientResponse.filterStatusOk))
+
+/**
+ * Route through a target proxy (Burp/ZAP) and/or bypass TLS verification for self-signed target
+ * certs. Typed off `Parameters<typeof fetch>` (not the DOM `RequestInfo` name, which this package's
+ * lib config doesn't declare) and cast to `typeof fetch` since FetchHttpClient.Fetch's type includes
+ * static members (e.g. `preconnect`) this closure never needs to actually implement.
+ */
+const customFetch = (sslVerify: boolean | undefined, proxy: string | undefined) =>
+  ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const finalInit = { ...init } as any
+    if (sslVerify === false) {
+      finalInit.tls = { rejectUnauthorized: false }
+      finalInit.rejectUnauthorized = false
+    }
+    if (proxy) finalInit.proxy = proxy
+    return fetch(input, finalInit)
+  }) as typeof fetch
 
 const collectBody = (response: HttpClientResponse.HttpClientResponse) =>
   collectBoundedResponseBody(
@@ -148,9 +192,23 @@ const layer = Layer.effectDiscard(
                 source: { type: "tool", messageID: context.assistantMessageID, callID: context.toolCallID },
               })
 
+              const method = (input.method || "GET").toUpperCase()
+              const requestHeaders = { ...headers(input.format, browserUserAgent), ...(input.headers ?? {}) }
+
               const { body, contentType } = yield* Effect.gen(function* () {
-                const response = yield* execute(http, input.url, input.format).pipe(
-                  Effect.catchIf(isCloudflareChallenge, () => execute(http, input.url, input.format, "impactr")),
+                const response = yield* execute(http, input.url, method, requestHeaders, input.body).pipe(
+                  // Retry with an honest UA if blocked by Cloudflare bot detection (TLS fingerprint
+                  // mismatch); the caller's User-Agent (in any casing) is stripped first so this
+                  // always wins rather than depending on object-spread key-collision behavior.
+                  Effect.catchIf(isCloudflareChallenge, () =>
+                    execute(
+                      http,
+                      input.url,
+                      method,
+                      { ...withoutHeader(requestHeaders, "User-Agent"), "User-Agent": "impactr" },
+                      input.body,
+                    ),
+                  ),
                 )
                 const contentType = response.headers["content-type"] || ""
                 const mime = mimeFrom(contentType)
@@ -164,6 +222,7 @@ const layer = Layer.effectDiscard(
                   duration: Duration.seconds(input.timeout ?? DEFAULT_TIMEOUT_SECONDS),
                   orElse: () => Effect.fail(new Error("Request timed out")),
                 }),
+                Effect.provideService(FetchHttpClient.Fetch, customFetch(input.sslVerify, input.proxy)),
               )
               const content = new TextDecoder().decode(body)
               const output = yield* Effect.try({

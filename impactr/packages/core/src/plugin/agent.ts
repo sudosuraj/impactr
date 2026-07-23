@@ -4,6 +4,7 @@ import path from "path"
 import { define } from "./internal"
 import { Effect } from "effect"
 import { AgentV2 } from "../agent"
+import { PentestAgent } from "../agent/pentest"
 import { Global } from "../global"
 import { Location } from "../location"
 import { PermissionV2 } from "../permission"
@@ -30,33 +31,18 @@ Guidelines:
 
 Complete the user's search request efficiently and report your findings clearly.`
 
-const PROMPT_ORCHESTRATOR = `You are the Impactr Orchestrator, the primary agent driving the Continuous Discovery Engine. A human pentester doesn't stop after a set time; they stop when knowledge is saturated. You have no predefined finish line — the stopping condition is knowledge saturation, not time.
+/**
+ * Converts a PentestAgent.PermissionIntent (single source of truth, shared with the CLI lineage)
+ * into this engine's V2 rule-array Ruleset shape — the only place the two frameworks' rule shapes
+ * still legitimately differ; the intent content itself is never hand-duplicated here.
+ */
+const denyAll: PermissionV2.Rule = { action: "*", resource: "*", effect: "deny" }
 
-Your job is to own strategy and the shared Attack Graph, and to delegate the actual work to your specialized subagents rather than scanning or exploiting directly.
-
-Guidelines:
-- Maintain the 'attack_graph' tool as the single map of discovered assets, relationships, and exploitation state. Add nodes and edges as the picture develops, and query it before acting so you never loop on an asset you have already covered. If the graph reports a node as stuck (a high loop count), change your approach instead of re-enumerating it.
-- Delegate reconnaissance to the @recon subagent to enumerate assets, ports, and directories. Delegate exploitation of a single, specific, confirmed target to the @attack subagent.
-- Whenever you learn something meaningful, use 'record_discovery' to log it to the Knowledge Graph with accurate novelty, confidence, and impact scores.
-- When an avenue needs separate focused investigation, use 'queue_hypothesis' instead of getting distracted. The engine automatically pops the highest-priority hypothesis and hands it back to you when you are ready for the next task, along with a digest of what is already known.
-- Operate strictly within the explicitly authorized scope. Never direct a subagent at a target you have not been authorized to test.`
-
-const PROMPT_RECON = `You are the Impactr Recon subagent. Your sole purpose is to discover assets, open ports, subdomains, and directories on the orchestrator's authorized targets.
-
-Guidelines:
-- Use the 'bash' tool to run standard, non-intrusive enumeration tools.
-- You do NOT exploit anything. When you find a valid service, port, or hidden directory, record it with 'record_discovery' (accurate novelty, confidence, and impact scores).
-- When you spot something notoriously vulnerable, queue it with 'queue_hypothesis' for the orchestrator to schedule — do not chase it yourself.
-- Extract the signal from noisy tool output and return a concise summary of discovered targets to the orchestrator.
-- Stay within the authorized scope at all times.`
-
-const PROMPT_ATTACK = `You are the Impactr Attack subagent. Your sole purpose is to exploit one specific, already-identified vulnerability passed to you by the orchestrator, and to prove impact.
-
-Guidelines:
-- Focus entirely on your assigned target. Do NOT wander into other endpoints or re-run broad reconnaissance.
-- Use the 'bash' tool to exploit and prove impact (e.g. popping a shell, dumping a database, proving XSS).
-- When you confirm the vulnerability, use 'draft_vulnerability' to write up the finding with exact reproduction steps, a CVSS estimate, impact, and remediation. Return the proof of exploit, or clearly state that exploitation failed.
-- Stay within the authorized scope at all times.`
+const rulesFromIntent = (intent: PentestAgent.PermissionIntent): PermissionV2.Ruleset => [
+  ...(intent.denyByDefault ? [denyAll] : []),
+  ...intent.allow.map((action): PermissionV2.Rule => ({ action, resource: "*", effect: "allow" })),
+  ...(intent.deny ?? []).map((action): PermissionV2.Rule => ({ action, resource: "*", effect: "deny" })),
+]
 
 const PROMPT_COMPACTION = `You are an anchored context summarization assistant for coding sessions.
 
@@ -209,28 +195,45 @@ export const Plugin = define({
         )
       })
 
-      draft.update(AgentV2.ID.make("orchestrator"), (item) => {
-        item.description =
-          "Primary pentesting orchestrator. Owns the Attack Graph, drives the Continuous Discovery Engine, and delegates recon and exploitation to the @recon and @attack subagents."
-        item.system = PROMPT_ORCHESTRATOR
-        item.mode = "primary"
-        item.permissions.push(...defaults)
+      // The five pentest agents below are defined ONCE in packages/core/src/agent/pentest.ts — the
+      // single source of truth shared with the CLI (packages/impactr/src/agent/agent.ts). Name,
+      // mode, description, prompt, and permission intent all come from there; only the conversion
+      // from PermissionIntent into this engine's V2 rule-array Ruleset happens here.
+      draft.update(AgentV2.ID.make(PentestAgent.ORCHESTRATOR.id), (item) => {
+        item.description = PentestAgent.ORCHESTRATOR.description
+        item.system = PentestAgent.ORCHESTRATOR.prompt
+        item.mode = PentestAgent.ORCHESTRATOR.mode
+        item.permissions.push(...PermissionV2.merge(defaults, rulesFromIntent(PentestAgent.ORCHESTRATOR.permission)))
       })
 
-      draft.update(AgentV2.ID.make("recon"), (item) => {
-        item.description =
-          "Reconnaissance subagent. Enumerates assets, ports, subdomains, and directories, and records findings without exploiting."
-        item.system = PROMPT_RECON
-        item.mode = "subagent"
-        item.permissions.push(...defaults)
+      draft.update(AgentV2.ID.make(PentestAgent.RECON.id), (item) => {
+        item.description = PentestAgent.RECON.description
+        item.system = PentestAgent.RECON.prompt
+        item.mode = PentestAgent.RECON.mode
+        item.permissions.push(...PermissionV2.merge(defaults, rulesFromIntent(PentestAgent.RECON.permission)))
       })
 
-      draft.update(AgentV2.ID.make("attack"), (item) => {
-        item.description =
-          "Exploitation subagent. Exploits a single orchestrator-assigned vulnerability, proves impact, and drafts the finding."
-        item.system = PROMPT_ATTACK
-        item.mode = "subagent"
-        item.permissions.push(...defaults)
+      draft.update(AgentV2.ID.make(PentestAgent.ENUMERATE.id), (item) => {
+        item.description = PentestAgent.ENUMERATE.description
+        item.system = PentestAgent.ENUMERATE.prompt
+        item.mode = PentestAgent.ENUMERATE.mode
+        item.permissions.push(
+          ...PermissionV2.merge(defaults, rulesFromIntent(PentestAgent.ENUMERATE.permission), readonlyExternalDirectory),
+        )
+      })
+
+      draft.update(AgentV2.ID.make(PentestAgent.EXPLOIT.id), (item) => {
+        item.description = PentestAgent.EXPLOIT.description
+        item.system = PentestAgent.EXPLOIT.prompt
+        item.mode = PentestAgent.EXPLOIT.mode
+        item.permissions.push(...PermissionV2.merge(defaults, rulesFromIntent(PentestAgent.EXPLOIT.permission)))
+      })
+
+      draft.update(AgentV2.ID.make(PentestAgent.REPORT.id), (item) => {
+        item.description = PentestAgent.REPORT.description
+        item.system = PentestAgent.REPORT.prompt
+        item.mode = PentestAgent.REPORT.mode
+        item.permissions.push(...PermissionV2.merge(defaults, rulesFromIntent(PentestAgent.REPORT.permission)))
       })
 
       draft.update(AgentV2.ID.make("compaction"), (item) => {

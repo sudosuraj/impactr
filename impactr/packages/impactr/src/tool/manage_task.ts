@@ -1,25 +1,66 @@
 import { Effect, Schema } from "effect"
 import { BackgroundJob } from "@/background/job"
+import { Session } from "@/session/session"
+import type { SessionID } from "@/session/schema"
 import * as Tool from "./tool"
 
 export const Parameters = Schema.Struct({
-  action: Schema.Literals(["list", "kill", "status"]).annotate({ description: "The action to perform: 'list' (list all running tasks), 'kill' (cancel the task), 'status' (check the task status)." }),
+  action: Schema.Literals(["list", "kill", "status", "tree"]).annotate({ description: "The action to perform: 'list' (list all running tasks), 'kill' (cancel the task), 'status' (check the task status), 'tree' (show every subagent session spawned from here so far, including nested sub-delegations)." }),
   taskId: Schema.optional(Schema.String).annotate({ description: "The task ID to manage. Required when action is 'kill' or 'status'." }),
 })
+
+const MAX_TREE_DEPTH = 10
+const MAX_TREE_NODES = 200
+
+function formatIdle(idleMs?: number) {
+  if (idleMs === undefined) return ""
+  const minutes = Math.floor(idleMs / 60_000)
+  if (minutes < 1) return ""
+  return `, idle ${minutes}m`
+}
 
 export const ManageTaskTool = Tool.define(
   "manage_task",
   Effect.gen(function* () {
     const background = yield* BackgroundJob.Service
+    const sessions = yield* Session.Service
     return {
-    description: "Manage background tasks. Use this tool to list running tasks or interact with tasks that were sent to the background via background=true flag.",
+    description: "Manage background tasks. Use this tool to list running tasks, interact with tasks that were sent to the background via background=true flag, or view the tree of subagent sessions spawned so far (including grandchildren) with 'tree'. A subagent idle for a while with no activity (no tool calls, no output) is auto-promoted to background so you regain control — check 'list'/'tree' for '(idle Nm)' and use 'kill' if it's genuinely stuck.",
     parameters: Parameters,
     execute: ({ action, taskId }, ctx) => Effect.gen(function* () {
       if (action === "list") {
         const jobs = yield* background.list()
         const running = jobs.filter(j => j.status === "running")
         if (running.length === 0) return "No running background tasks."
-        return "Running Background Tasks:\n" + running.map(j => `- [${j.id}] ${j.type} (${j.title})`).join("\n")
+        return "Running Background Tasks:\n" + running.map(j => `- [${j.id}] ${j.type} (${j.title})${formatIdle(j.idle_ms)}`).join("\n")
+      }
+
+      if (action === "tree") {
+        const jobs = yield* background.list()
+        const jobByID = new Map(jobs.map((job) => [job.id, job]))
+
+        const lines: string[] = []
+        type Frame = { id: SessionID; depth: number; label?: string }
+        // Bounded pre-order DFS guards against an unexpected cycle or runaway fan-out in the
+        // delegation tree. Each frame's line renders when it's popped, not when it's discovered —
+        // pushing children in reverse then makes the LIFO stack pop (and print) them in creation
+        // order, and keeps a multi-level tree in true pre-order instead of interleaving branches.
+        const stack: Frame[] = [{ id: ctx.sessionID, depth: 0 }]
+        while (stack.length > 0 && lines.length < MAX_TREE_NODES) {
+          const frame = stack.pop()!
+          if (frame.label !== undefined) lines.push(frame.label)
+          if (frame.depth > MAX_TREE_DEPTH) continue
+          const children = yield* sessions.children(frame.id)
+          for (const child of [...children].reverse()) {
+            const job = jobByID.get(child.id)
+            const status = job ? ` (${job.status}${formatIdle(job.idle_ms)})` : ""
+            const label = `${"  ".repeat(frame.depth)}- [${child.id}] ${child.agent ?? "unknown"}: ${child.title}${status}`
+            stack.push({ id: child.id, depth: frame.depth + 1, label })
+          }
+        }
+
+        if (lines.length === 0) return "No subagent sessions spawned yet."
+        return "Subagent Session Tree:\n" + lines.join("\n")
       }
 
       if (!taskId) return "Error: taskId is required for kill or status actions."
@@ -34,7 +75,7 @@ export const ManageTaskTool = Tool.define(
         const job = yield* background.get(taskId)
         if (!job) return `Task ${taskId} not found.`
 
-        let out = `Task: ${job.id}\nType: ${job.type}\nStatus: ${job.status}\n`
+        let out = `Task: ${job.id}\nType: ${job.type}\nStatus: ${job.status}${formatIdle(job.idle_ms)}\n`
         if (job.title) out += `Title: ${job.title}\n`
         if (job.output) out += `\n--- Output ---\n${job.output}\n`
         if (job.error) out += `\n--- Error ---\n${job.error}\n`
